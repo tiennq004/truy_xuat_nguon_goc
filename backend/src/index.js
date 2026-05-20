@@ -187,8 +187,8 @@ app.post("/api/drugs", async (req, res) => {
       manufacturer,
       drugImageUrl: persistedDrugImageUrl || "",
       currentOwner: manufacturer || "manufacturer",
-      status: "Created",
-      history: [{ status: "Created", owner: manufacturer || "manufacturer", at: new Date().toISOString() }],
+      status: "Manufacturer",
+      history: [{ status: "Manufacturer", owner: manufacturer || "manufacturer", at: new Date().toISOString() }],
       drugHash,
       verifyUrl,
       qrDataUrl,
@@ -268,8 +268,8 @@ app.post("/api/drugs/offchain", async (req, res) => {
       manufacturer,
       drugImageUrl: persistedDrugImageUrl || "",
       currentOwner: owner || manufacturer || "manufacturer",
-      status: status || "Created",
-      history: [{ status: status || "Created", owner: owner || manufacturer || "manufacturer", at: new Date().toISOString() }],
+      status: status || "Manufacturer",
+      history: [{ status: status || "Manufacturer", owner: owner || manufacturer || "manufacturer", at: new Date().toISOString() }],
       drugHash,
       verifyUrl,
       qrDataUrl,
@@ -293,12 +293,12 @@ app.post("/api/drugs/:serial/transfer", async (req, res) => {
     const next = {
       ...drug,
       currentOwner: to || drug.currentOwner,
-      status: status || "Shipping",
-      history: [...drug.history, { owner: to || drug.currentOwner, status: status || "Shipping", at: new Date().toISOString() }],
+      status: status || "Distributor",
+      history: [...drug.history, { owner: to || drug.currentOwner, status: status || "Distributor", at: new Date().toISOString() }],
     };
 
     await storage.saveDrug(next);
-    const chainResult = await chain.transferDrug(serial, from || "unknown", to || "unknown", status || "Shipping");
+    const chainResult = await chain.transferDrug(serial, from || "unknown", to || "unknown", status || "Distributor");
     res.json({ ...next, txHash: chainResult.txHash });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -315,9 +315,9 @@ app.post("/api/drugs/:serial/transfer/offchain", async (req, res) => {
     const next = {
       ...drug,
       currentOwner: to || drug.currentOwner,
-      status: status || "Shipping",
+      status: status || "Distributor",
       txHash: txHash || drug.txHash || "",
-      history: [...drug.history, { owner: to || drug.currentOwner, status: status || "Shipping", at: new Date().toISOString(), txHash: txHash || "" }],
+      history: [...drug.history, { owner: to || drug.currentOwner, status: status || "Distributor", at: new Date().toISOString(), txHash: txHash || "" }],
     };
 
     await storage.saveDrug(next);
@@ -331,11 +331,38 @@ app.get("/api/verify/:serial", async (req, res) => {
   try {
     const { serial } = req.params;
     const drug = await storage.getDrug(serial);
-    if (!drug) return res.status(404).json({ authentic: false, message: "Serial not found" });
+    if (!drug) return res.status(404).json({ authentic: false, message: "Không tìm thấy mã thuốc này." });
 
     const newHash = sha256FromParts([drug.drugId, drug.materialsUsed.join(","), drug.batch]);
     const chainHash = await chain.getDrugHash(serial);
     const authentic = chainHash === newHash;
+
+    const materialsDetail = [];
+    for (const materialId of drug.materialsUsed || []) {
+      // eslint-disable-next-line no-await-in-loop
+      const material = await storage.getMaterial(materialId);
+      materialsDetail.push(
+        material
+          ? {
+              materialId: material.materialId,
+              name: material.name || "",
+              origin: material.origin || "",
+              certificate: material.certificate || "",
+              expiry: material.expiry || "",
+              supplier: material.supplier || "",
+              materialImageUrl: material.materialImageUrl || "",
+            }
+          : {
+              materialId,
+              name: "Không tìm thấy trong hệ thống",
+              origin: "",
+              certificate: "",
+              expiry: "",
+              supplier: "",
+              materialImageUrl: "",
+            }
+      );
+    }
 
     await storage.logScan({
       serial,
@@ -347,16 +374,18 @@ app.get("/api/verify/:serial", async (req, res) => {
 
     res.json({
       authentic,
-      result: authentic ? "Authentic Drug" : "Potential Counterfeit",
+      result: authentic ? "Thuốc chính hãng" : "Nghi ngờ thuốc giả",
       chainHash,
       newHash,
       drug,
+      materialsDetail,
+      verifiedAt: new Date().toISOString(),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`API running at http://localhost:${port}`);
 });

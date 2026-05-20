@@ -10,14 +10,20 @@ import {
   createMaterialOffchain,
   getChainConfig,
   healthCheck,
-  loadHostHints,
   listMaterials,
   listDrugs,
   transferDrug,
   transferDrugOffchain,
   verifyDrug,
 } from "./api";
-import { buildVerifyUrl, canPhoneScanQr, getVerifyBase } from "./utils/url";
+import { buildVerifyUrl, canPhoneScanQr, getApiBase, getVerifyBase } from "./utils/url";
+import {
+  SUPPLY_CHAIN_STEPS,
+  getReachedStepIndex,
+  getSaleStatus,
+  getStatusLabel,
+  normalizeStatus,
+} from "./utils/status";
 
 async function sha256Hex(input) {
   const data = new TextEncoder().encode(input);
@@ -37,7 +43,7 @@ async function fileToDataUrl(file) {
   });
 }
 
-function Header({ connectWallet, loadHealth, wallet, health, message, loading, darkMode, toggleDarkMode, phoneScanUrl }) {
+function Header({ connectWallet, loadHealth, wallet, health, message, loading, darkMode, toggleDarkMode }) {
   return (
     <header className="header-card">
       <span className="badge">Pharma Commerce</span>
@@ -53,11 +59,6 @@ function Header({ connectWallet, loadHealth, wallet, health, message, loading, d
         </button>
       </div>
       {health && <p className="status-pill">Lưu trữ: {health.storageMode} | Blockchain: {health.chainMode}</p>}
-      {phoneScanUrl && (
-        <p className="scan-ready-banner">
-          📱 Quét QR trên điện thoại (cùng Wi-Fi): mở app bằng <b>{phoneScanUrl}</b> rồi tạo thuốc — quét là hiện thông tin ngay.
-        </p>
-      )}
       <p className="muted">{wallet.connected ? "Chế độ: Ký giao dịch bằng MetaMask" : "Chế độ: Ký giao dịch bằng backend"}</p>
       {message && <p className="message-line">{message}</p>}
       <nav className="tabs">
@@ -65,6 +66,7 @@ function Header({ connectWallet, loadHealth, wallet, health, message, loading, d
         <NavLink to="/nguyen-lieu">🧪 Nguyên liệu</NavLink>
         <NavLink to="/san-xuat">💊 Sản xuất thuốc</NavLink>
         <NavLink to="/phan-phoi">🚚 Phân phối</NavLink>
+        <NavLink to="/kho-qr">📱 Kho QR</NavLink>
         <NavLink to="/xac-minh">🔎 Xác minh QR</NavLink>
       </nav>
     </header>
@@ -184,8 +186,8 @@ function HomePage() {
                   <div className="product-image product-image-placeholder">NO IMAGE</div>
                 )}
                 <div className="product-content">
-                  <span className={`product-badge ${product.status === "Shipping" ? "pending" : ""}`}>
-                    {product.status || "Created"}
+                  <span className={`product-badge ${normalizeStatus(product.status) === "Sold" ? "" : "pending"}`}>
+                    {getStatusLabel(product.status)}
                   </span>
                   <h3>{product.drugName || product.drugId}</h3>
                   <p>Serial: {product.serial}</p>
@@ -343,7 +345,6 @@ function DrugPage({ submitDrug, createdDrug, phoneScanReady }) {
         <input value={drug.expiry} onChange={(e) => setDrug({ ...drug, expiry: e.target.value })} placeholder="Hạn sử dụng" />
         <input type="file" accept="image/*" onChange={async (e) => setDrug({ ...drug, drugImageUrl: await fileToDataUrl(e.target.files?.[0]) })} />
         {drug.drugImageUrl && <img className="preview" src={drug.drugImageUrl} alt="Thuốc" />}
-        <p className="muted">Mỗi loại thuốc = 1 QR. Quét bằng camera điện thoại → hiện thông tin ngay, không cần nhập link.</p>
         {!phoneScanReady && (
           <p className="bad">Đang dùng localhost: chưa quét được trên điện thoại. Chờ hệ thống lấy IP Wi-Fi hoặc mở app bằng IP LAN.</p>
         )}
@@ -368,7 +369,7 @@ function DrugPage({ submitDrug, createdDrug, phoneScanReady }) {
 }
 
 function DistributionPage({ submitTransfer }) {
-  const [transfer, setTransfer] = useState({ serial: "", from: "", to: "", status: "Shipping" });
+  const [transfer, setTransfer] = useState({ serial: "", from: "", to: "", status: "Distributor" });
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -382,12 +383,96 @@ function DistributionPage({ submitTransfer }) {
       <input value={transfer.from} onChange={(e) => setTransfer({ ...transfer, from: e.target.value })} placeholder="Nhập bên gửi" />
       <input value={transfer.to} onChange={(e) => setTransfer({ ...transfer, to: e.target.value })} placeholder="Nhập bên nhận / địa chỉ ví" />
       <select value={transfer.status} onChange={(e) => setTransfer({ ...transfer, status: e.target.value })}>
-        <option value="Shipping">Đang vận chuyển</option>
-        <option value="Warehouse">Đã vào kho</option>
-        <option value="Delivered">Đã giao</option>
+        <option value="Manufacturer">Nhà sản xuất</option>
+        <option value="Distributor">Nhà phân phối</option>
+        <option value="Hospital">Bệnh viện</option>
+        <option value="Pharmacy">Nhà thuốc</option>
+        <option value="Sold">Đã bán</option>
       </select>
       <button className="btn-primary" type="submit">Chuyển giao thuốc</button>
     </form>
+  );
+}
+
+function QrLibraryPage() {
+  const [drugs, setDrugs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [keyword, setKeyword] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    listDrugs()
+      .then((res) => {
+        if (!active) return;
+        setDrugs(res.items || []);
+        setError("");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setDrugs([]);
+        setError(err.response?.data?.error || err.message || "Không tải được danh sách QR.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = drugs.filter((drug) => {
+    const key = keyword.trim().toLowerCase();
+    if (!key) return true;
+    return (
+      String(drug.serial || "").toLowerCase().includes(key) ||
+      String(drug.drugId || "").toLowerCase().includes(key) ||
+      String(drug.drugName || "").toLowerCase().includes(key)
+    );
+  });
+
+  return (
+    <div className="qr-library-page">
+      <div className="card">
+        <h2><span className="section-icon">📱</span>Kho QR thuốc</h2>
+        <p className="muted">Mỗi thẻ là một mã thuốc và QR tương ứng. Quét QR để mở trang xác minh đúng mã đó.</p>
+        <input
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="Tìm theo mã thuốc, serial, tên..."
+        />
+      </div>
+
+      {loading && <p className="muted">Đang tải danh sách QR...</p>}
+      {error && <p className="bad">{error}</p>}
+
+      {!loading && !error && filtered.length === 0 && (
+        <div className="card empty-products">
+          <p>Chưa có QR nào trong hệ thống.</p>
+          <p className="muted">Vào trang Sản xuất thuốc để tạo mã và QR mới.</p>
+        </div>
+      )}
+
+      <div className="qr-library-grid">
+        {filtered.map((drug) => (
+          <article className="card qr-library-item" key={drug.serial}>
+            <div className="qr-library-head">
+              <span className="product-badge">{getStatusLabel(drug.status)}</span>
+              <h3>{drug.drugName || drug.drugId}</h3>
+              <p><b>Mã thuốc:</b> {drug.drugId}</p>
+              <p><b>Serial / QR code:</b> {drug.serial}</p>
+              <p><b>Lô:</b> {drug.batch || "—"}</p>
+            </div>
+            <div className="qr-library-code-wrap">
+              <QRCodeSVG value={buildVerifyUrl(drug.serial)} size={180} />
+            </div>
+            <p className="mono">{buildVerifyUrl(drug.serial)}</p>
+            <Link to={`/verify/${drug.serial}`}>Mở trang xác minh</Link>
+          </article>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -414,22 +499,12 @@ function Dashboard() {
   const [createdDrug, setCreatedDrug] = useState(null);
   const [message, setMessage] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [phoneScanUrl, setPhoneScanUrl] = useState("");
-  const [phoneScanReady, setPhoneScanReady] = useState(canPhoneScanQr());
+  const [phoneScanReady] = useState(canPhoneScanQr());
 
   useEffect(() => {
     document.body.classList.toggle("dark-theme", darkMode);
     return () => document.body.classList.remove("dark-theme");
   }, [darkMode]);
-
-  useEffect(() => {
-    loadHostHints().then((hints) => {
-      if (hints?.phoneFrontendUrl) {
-        setPhoneScanUrl(hints.phoneFrontendUrl);
-      }
-      setPhoneScanReady(canPhoneScanQr());
-    });
-  }, []);
 
   function toggleDarkMode() {
     setDarkMode((prev) => !prev);
@@ -523,7 +598,7 @@ function Dashboard() {
           expiry: drug.expiry,
           manufacturer: drug.manufacturer,
           owner: address,
-          status: "Created",
+            status: "Manufacturer",
           drugHash,
           txHash: tx.hash,
           verifyBase: getVerifyBase(),
@@ -555,10 +630,10 @@ function Dashboard() {
         const tx = await contract.transferDrug(transfer.serial, transfer.to, transfer.status);
         await tx.wait();
         const data = await transferDrugOffchain(transfer.serial, { ...transfer, txHash: tx.hash });
-        setMessage(`Chuyển giao bằng MetaMask thành công: ${data.currentOwner} - ${data.status}`);
+        setMessage(`Cập nhật trạng thái thành công: ${getStatusLabel(data.status)} (${data.currentOwner})`);
       } else {
         const data = await transferDrug(transfer.serial, transfer);
-        setMessage(`Chuyển giao bằng backend signer thành công: ${data.currentOwner} - ${data.status}`);
+        setMessage(`Cập nhật trạng thái thành công: ${getStatusLabel(data.status)} (${data.currentOwner})`);
       }
     } catch (error) {
       setMessage(`Chuyển giao thất bại: ${error.message}`);
@@ -591,7 +666,6 @@ function Dashboard() {
         loading={loading}
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
-        phoneScanUrl={phoneScanUrl}
       />
       <div className="page-transition" key={location.pathname}>
         <Routes>
@@ -599,11 +673,37 @@ function Dashboard() {
           <Route path="/nguyen-lieu" element={<MaterialPage submitMaterial={submitMaterial} />} />
           <Route path="/san-xuat" element={<DrugPage submitDrug={submitDrug} createdDrug={createdDrug} phoneScanReady={phoneScanReady} />} />
           <Route path="/phan-phoi" element={<DistributionPage submitTransfer={submitTransfer} />} />
+          <Route path="/kho-qr" element={<QrLibraryPage />} />
           <Route path="/xac-minh" element={<VerifyHubPage createdDrug={createdDrug} />} />
         </Routes>
       </div>
     </div>
   );
+}
+
+function SupplyChainTracker({ status, history }) {
+  const reached = getReachedStepIndex(status, history);
+  return (
+    <div className="supply-chain">
+      {SUPPLY_CHAIN_STEPS.map((step, index) => {
+        const active = index <= reached;
+        const current = normalizeStatus(status) === step.key;
+        return (
+          <div className={`supply-step ${active ? "active" : ""} ${current ? "current" : ""}`} key={step.key}>
+            <span className="supply-icon">{step.icon}</span>
+            <b>{step.label}</b>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("vi-VN");
 }
 
 function VerifyPage() {
@@ -623,7 +723,7 @@ function VerifyPage() {
       const message = e.response?.data?.message || e.response?.data?.error || e.message;
       if (String(message).includes("Network Error")) {
         setError(
-          "Không kết nối được backend. Trên điện thoại: mở http://<IP-máy-tính>:5173 và đảm bảo backend chạy ở cổng 4000."
+          `Không kết nối được backend (${getApiBase()}). Kiểm tra: (1) backend đang chạy: cd backend && npm run dev, (2) restart frontend sau khi sửa, (3) điện thoại mở đúng ${window.location.origin}`
         );
       } else {
         setError(message);
@@ -657,16 +757,79 @@ function VerifyPage() {
       )}
       {error && <p className="bad">{error}</p>}
       {data && (
-        <div className="card verify-result">
-          <h2 className={data.authentic ? "ok" : "bad"}>{data.result}</h2>
-          <p><b>Mã thuốc:</b> {data.drug.drugId}</p>
-          <p><b>Tên thuốc:</b> {data.drug.drugName || "Chưa cập nhật"}</p>
-          <p><b>Lô sản xuất:</b> {data.drug.batch}</p>
-          <p><b>Nhà sản xuất:</b> {data.drug.manufacturer}</p>
-          <p><b>Chủ sở hữu hiện tại:</b> {data.drug.currentOwner}</p>
-          <p><b>Trạng thái:</b> {data.drug.status}</p>
-          <p><b>Nguyên liệu:</b> {data.drug.materialsUsed.join(", ")}</p>
-          <p><b>Số mốc lịch sử:</b> {data.drug.history.length}</p>
+        <div className="verify-layout">
+          <div className={`card verify-status ${data.authentic ? "is-authentic" : "is-fake"}`}>
+            <h2>{data.result}</h2>
+            <p>{data.authentic ? "Dữ liệu khớp với blockchain." : "Hash dữ liệu không khớp blockchain."}</p>
+            <p className="muted">Thời gian kiểm tra: {formatDateTime(data.verifiedAt)}</p>
+          </div>
+
+          <div className="card">
+            <h3>Trạng thái lưu thông & bán hàng</h3>
+            <div className="verify-status-row">
+              <span className={`sale-badge ${getSaleStatus(data.drug.status).className}`}>
+                {getSaleStatus(data.drug.status).label}
+              </span>
+              <span className="status-pill">{getStatusLabel(data.drug.status)}</span>
+            </div>
+            <SupplyChainTracker status={data.drug.status} history={data.drug.history} />
+            <p className="muted">Luồng: Nhà sản xuất → Nhà phân phối → Bệnh viện / Nhà thuốc → Đã bán</p>
+          </div>
+
+          <div className="card verify-product">
+            <h3>Thông tin thuốc</h3>
+            <div className="verify-product-grid">
+              {data.drug.drugImageUrl ? (
+                <img className="verify-hero-image" src={data.drug.drugImageUrl} alt={data.drug.drugName || data.drug.drugId} />
+              ) : (
+                <div className="verify-hero-image verify-hero-placeholder">Chưa có ảnh thuốc</div>
+              )}
+              <div className="verify-fields">
+                <p><span>Mã thuốc / Serial</span><b>{data.drug.drugId}</b></p>
+                <p><span>Tên thuốc</span><b>{data.drug.drugName || "Chưa cập nhật"}</b></p>
+                <p><span>Lô sản xuất</span><b>{data.drug.batch || "—"}</b></p>
+                <p><span>Hạn sử dụng</span><b>{data.drug.expiry || "—"}</b></p>
+                <p><span>Nhà sản xuất</span><b>{data.drug.manufacturer || "—"}</b></p>
+                <p><span>Đơn vị giữ hàng hiện tại</span><b>{data.drug.currentOwner || "—"}</b></p>
+                <p><span>Vị trí chuỗi cung ứng</span><b>{getStatusLabel(data.drug.status)}</b></p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3>Nguyên liệu sử dụng ({(data.materialsDetail || []).length})</h3>
+            <div className="verify-materials-grid">
+              {(data.materialsDetail || []).map((material) => (
+                <article className="verify-material-card" key={material.materialId}>
+                  {material.materialImageUrl ? (
+                    <img src={material.materialImageUrl} alt={material.name || material.materialId} />
+                  ) : (
+                    <div className="verify-material-placeholder">Chưa có ảnh</div>
+                  )}
+                  <div>
+                    <b>{material.materialId}</b>
+                    <p>{material.name || "—"}</p>
+                    <p>Xuất xứ: {material.origin || "—"}</p>
+                    <p>Chứng nhận: {material.certificate || "—"}</p>
+                    <p>HSD: {material.expiry || "—"}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3>Lịch sử phân phối ({data.drug.history?.length || 0} mốc)</h3>
+            <div className="verify-history">
+              {(data.drug.history || []).map((item, index) => (
+                <div className="verify-history-item" key={`${item.at}-${index}`}>
+                  <b>{getStatusLabel(item.status)}</b>
+                  <p>Chủ sở hữu: {item.owner || "—"}</p>
+                  <p className="muted">{formatDateTime(item.at)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

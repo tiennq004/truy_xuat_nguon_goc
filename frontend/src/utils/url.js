@@ -13,6 +13,10 @@ function isLocalHost(hostname) {
 }
 
 export function getApiBase() {
+  // Dev: phone/PC cùng gọi qua cổng 5173 (Vite proxy -> backend 4000)
+  if (import.meta.env.DEV) {
+    return `${window.location.origin}/api`;
+  }
   if (import.meta.env.VITE_API_BASE) {
     return import.meta.env.VITE_API_BASE;
   }
