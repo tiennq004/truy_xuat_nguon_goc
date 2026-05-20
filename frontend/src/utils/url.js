@@ -13,15 +13,15 @@ function isLocalHost(hostname) {
 }
 
 export function getApiBase() {
-  // Dev: phone/PC cùng gọi qua cổng 5173 (Vite proxy -> backend 4000)
-  if (import.meta.env.DEV) {
+  const { protocol, hostname } = window.location;
+  // Dev + Vercel production: cùng origin /api (Vite proxy hoặc vercel.json rewrite)
+  if (import.meta.env.DEV || !isLocalHost(hostname)) {
     return `${window.location.origin}/api`;
   }
   if (import.meta.env.VITE_API_BASE) {
     return import.meta.env.VITE_API_BASE;
   }
-  const { protocol, hostname } = window.location;
-  if (isLocalHost(hostname) && cachedLanIp) {
+  if (cachedLanIp) {
     return `${protocol}//${cachedLanIp}:4000/api`;
   }
   return `${protocol}//${hostname}:4000/api`;

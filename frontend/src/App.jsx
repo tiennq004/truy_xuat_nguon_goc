@@ -75,6 +75,7 @@ function Header({ connectWallet, loadHealth, wallet, health, message, loading, d
 
 function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -82,10 +83,12 @@ function HomePage() {
       .then((res) => {
         if (!active) return;
         setFeaturedProducts((res.items || []).slice(0, 8));
+        setLoadError("");
       })
-      .catch(() => {
+      .catch((err) => {
         if (!active) return;
         setFeaturedProducts([]);
+        setLoadError(err.response?.data?.error || err.message || "Không tải được danh sách thuốc.");
       });
     return () => {
       active = false;
@@ -171,6 +174,7 @@ function HomePage() {
 
       <div className="card featured-wide">
         <h2><span className="section-icon">🔥</span>Sản phẩm nổi bật (dữ liệu thật)</h2>
+        {loadError && <p className="bad">Không kết nối API ({getApiBase()}): {loadError}</p>}
         {featuredProducts.length === 0 ? (
           <div className="empty-products">
             <p>Chưa có sản phẩm nào để hiển thị.</p>
@@ -506,6 +510,19 @@ function Dashboard() {
     return () => document.body.classList.remove("dark-theme");
   }, [darkMode]);
 
+  useEffect(() => {
+    healthCheck()
+      .then((data) => {
+        setHealth(data);
+      })
+      .catch((error) => {
+        setMessage(
+          `Không kết nối API (${getApiBase()}): ${error.response?.data?.error || error.message}`
+        );
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function toggleDarkMode() {
     setDarkMode((prev) => !prev);
   }
@@ -520,6 +537,11 @@ function Dashboard() {
     const signer = await provider.getSigner();
     const address = await signer.getAddress();
     const chainConfig = await getChainConfig();
+    if (!chainConfig?.contractAddress) {
+      throw new Error(
+        "Backend chưa trả về CONTRACT_ADDRESS. Kiểm tra Render env và mở /api/chain-config."
+      );
+    }
     const contract = new ethers.Contract(chainConfig.contractAddress, chainConfig.abi, signer);
     setWallet({ address, connected: true });
     return { signer, contract, address };
