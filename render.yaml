@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pharma-trace-api
+    runtime: node
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: CONTRACT_ABI_FILE
+        value: abi/PharmaTrace.json

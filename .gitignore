@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+backend/.env
+blockchain/.env
+frontend/.env
+*.log
+.DS_Store
