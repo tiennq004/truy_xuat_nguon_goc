@@ -29,6 +29,20 @@ import {
   normalizeStatus,
 } from "./utils/status";
 
+function shortChainError(message) {
+  const text = String(message || "");
+  if (text.includes("Drug not found")) {
+    return "Mã lô chưa có trên blockchain. Hệ thống thử đăng ký lô hoặc chuyển từng hộp.";
+  }
+  if (text.includes("Only current owner")) {
+    return "Ví MetaMask không phải chủ lô trên chain. Dùng ví đã tạo lô, hoặc tắt MetaMask để backend chuyển giao.";
+  }
+  if (text.includes("user denied") || text.includes("ACTION_REJECTED")) {
+    return "Đã hủy trên MetaMask.";
+  }
+  return text.length > 140 ? "Giao dịch blockchain thất bại." : text;
+}
+
 async function sha256Hex(input) {
   const data = new TextEncoder().encode(input);
   const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
@@ -513,6 +527,8 @@ function DistributionPage({ submitTransferBulk, loading }) {
       lotSerial: transfer.lotSerial,
       batch: selectedGroup?.batch,
       drugId: selectedGroup?.drugId,
+      lotHash: selectedGroup?.boxes?.[0]?.drugHash,
+      materialsUsed: selectedGroup?.boxes?.[0]?.materialsUsed,
       from: transfer.from,
       to: transfer.to,
       status: transfer.status,
@@ -956,8 +972,31 @@ function Dashboard() {
     }
   }
 
+  async function transferBoxesOnChain(contract, list, to, status, from, onProgress) {
+    let ok = 0;
+    const failed = [];
+    let lastHash = "";
+    for (let i = 0; i < list.length; i += 1) {
+      const serial = list[i];
+      onProgress(`MetaMask: hộp ${i + 1}/${list.length} — ${serial}`);
+      try {
+        const tx = await contract.transferDrug(serial, to, status);
+        await tx.wait();
+        lastHash = tx.hash;
+        await transferDrugOffchain(serial, { from, to, status, txHash: tx.hash });
+        ok += 1;
+      } catch (err) {
+        failed.push({ serial, error: shortChainError(err.message) });
+        if (String(err?.message || "").includes("user denied") || String(err?.code) === "ACTION_REJECTED") {
+          break;
+        }
+      }
+    }
+    return { ok, failed, lastHash };
+  }
+
   async function submitTransferBulk(transfer) {
-    const { lotSerial, drugId, from, to, status, fromStatus, serials } = transfer;
+    const { lotSerial, drugId, from, to, status, fromStatus, serials, lotHash, materialsUsed, batch } = transfer;
     const list = Array.isArray(serials) ? serials.filter(Boolean) : [];
     const lotKey = lotSerial || buildLotSerial(drugId, transfer.batch);
     if (!lotKey || list.length === 0) {
@@ -969,19 +1008,61 @@ function Dashboard() {
       let ok = 0;
       const failed = [];
       if (wallet.connected) {
-        const { contract } = await getSignerAndContract();
-        setMessage(`MetaMask: chuyển giao lô ${lotKey}...`);
-        try {
-          const tx = await contract.transferDrug(lotKey, to, status);
-          await tx.wait();
-          for (let i = 0; i < list.length; i += 1) {
-            const serial = list[i];
-            setMessage(`Đang cập nhật hộp ${i + 1}/${list.length}...`);
-            await transferDrugOffchain(serial, { from, to, status, txHash: tx.hash });
-            ok += 1;
+        const { contract, address } = await getSignerAndContract();
+        let hashForLot = lotHash || "";
+        if (!hashForLot && drugId && batch && materialsUsed?.length) {
+          hashForLot = await sha256Hex(lotHashInput(drugId, materialsUsed, batch));
+        }
+
+        let lotOnChain = false;
+        if (hashForLot) {
+          try {
+            const existing = await contract.getDrugHash(lotKey);
+            lotOnChain = Boolean(existing);
+          } catch (_e) {
+            lotOnChain = false;
           }
-        } catch (err) {
-          failed.push({ serial: lotKey, error: err.message });
+        }
+
+        if (!lotOnChain && hashForLot) {
+          setMessage(`Đăng ký lô ${lotKey} trên blockchain...`);
+          try {
+            const txReg = await contract.registerDrug(lotKey, hashForLot, address);
+            await txReg.wait();
+            lotOnChain = true;
+          } catch (regErr) {
+            if (!String(regErr?.message || "").includes("Drug already exists")) {
+              setMessage(shortChainError(regErr.message));
+            }
+          }
+        }
+
+        let lotDone = false;
+        if (lotOnChain) {
+          setMessage(`MetaMask: chuyển giao lô ${lotKey}...`);
+          try {
+            const tx = await contract.transferDrug(lotKey, to, status);
+            await tx.wait();
+            for (let i = 0; i < list.length; i += 1) {
+              const serial = list[i];
+              setMessage(`Đang cập nhật hộp ${i + 1}/${list.length}...`);
+              await transferDrugOffchain(serial, { from, to, status, txHash: tx.hash });
+              ok += 1;
+            }
+            lotDone = true;
+          } catch (lotErr) {
+            const msg = String(lotErr?.message || "");
+            if (!msg.includes("Drug not found") && !msg.includes("Only current owner")) {
+              failed.push({ serial: lotKey, error: shortChainError(msg) });
+            }
+          }
+        }
+
+        if (!lotDone) {
+          setMessage("Chuyển giao từng hộp trên blockchain...");
+          const boxResult = await transferBoxesOnChain(contract, list, to, status, from, setMessage);
+          ok = boxResult.ok;
+          failed.push(...boxResult.failed);
         }
       } else {
         const data = await transferDrugBulk({ drugId, from, to, status, fromStatus, serials: list });
@@ -989,12 +1070,12 @@ function Dashboard() {
         if (data.errors?.length) failed.push(...data.errors);
       }
       if (failed.length > 0) {
-        setMessage(`Chuyển giao lô ${lotKey}: ${ok}/${list.length} hộp · lỗi ${failed[0].error}`);
+        setMessage(`Đã chuyển ${ok}/${list.length} hộp · ${failed[0].error}`);
       } else {
-        setMessage(`Đã chuyển giao lô ${lotKey}: ${ok} hộp → ${getStatusLabel(status)}.`);
+        setMessage(`Đã chuyển giao: ${ok} hộp → ${getStatusLabel(status)}.`);
       }
     } catch (error) {
-      setMessage(`Chuyển giao lô thất bại: ${error.message}`);
+      setMessage(`Chuyển giao lô thất bại: ${shortChainError(error.message)}`);
     } finally {
       setLoading(false);
     }

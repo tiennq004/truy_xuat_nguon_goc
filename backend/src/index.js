@@ -379,12 +379,39 @@ app.post("/api/drugs/transfer-bulk", async (req, res) => {
     const errors = [];
     for (const [lotSerial, lotBoxes] of lotGroups) {
       let chainTxHash = "";
+      const first = lotBoxes[0];
+      const lotHash = sha256FromParts(lotHashParts(first.drugId, first.materialsUsed, first.batch));
       try {
+        if (!(await chain.drugExists(lotSerial))) {
+          await chain.registerDrug(lotSerial, lotHash, first.manufacturer || "manufacturer");
+        }
         const chainResult = await chain.transferDrug(lotSerial, from || "unknown", to, nextStatus);
         chainTxHash = chainResult.txHash;
-      } catch (err) {
-        errors.push({ serial: lotSerial, error: err.message });
-        continue;
+      } catch (lotErr) {
+        for (const drug of lotBoxes) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            if (!(await chain.drugExists(drug.serial))) {
+              const boxHash = sha256FromParts([
+                drug.drugId,
+                (drug.materialsUsed || []).join(","),
+                drug.batch,
+                drug.serial,
+              ]);
+              // eslint-disable-next-line no-await-in-loop
+              await chain.registerDrug(drug.serial, boxHash, drug.manufacturer || "manufacturer");
+            }
+            // eslint-disable-next-line no-await-in-loop
+            const boxChain = await chain.transferDrug(drug.serial, from || "unknown", to, nextStatus);
+            chainTxHash = boxChain.txHash;
+          } catch (boxErr) {
+            errors.push({ serial: drug.serial, error: boxErr.message });
+          }
+        }
+        if (!chainTxHash) {
+          errors.push({ serial: lotSerial, error: lotErr.message });
+          continue;
+        }
       }
       for (const drug of lotBoxes) {
         try {
