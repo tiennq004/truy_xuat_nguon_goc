@@ -200,38 +200,139 @@ body {
 
 /* Footer */
 .lc-footer {
-  background: var(--lc-blue-dark);
-  color: #c5d9f0;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0a4d8c 0%, #1565b8 45%, #1a7fd4 100%);
+  color: #e8f4ff;
   margin-top: auto;
-  padding: 28px 16px 16px;
+  padding: 36px 20px 20px;
+}
+.lc-footer-glow {
+  position: absolute;
+  top: -80px;
+  right: -40px;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, transparent 70%);
+  pointer-events: none;
 }
 .lc-footer-inner {
+  position: relative;
+  z-index: 1;
   max-width: 1280px;
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 28px;
 }
-.lc-footer b { color: #fff; font-size: 16px; }
-.lc-footer p { margin: 6px 0 0; font-size: 13px; }
-.lc-footer-links {
+.lc-footer-brand {
   display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+  max-width: 420px;
 }
-.lc-footer-links a {
+.lc-footer-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.lc-footer b {
+  color: #fff;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+.lc-footer-brand p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.92;
+}
+.lc-footer-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lc-footer-badges span {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.lc-footer-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 10px 20px;
+}
+@media (min-width: 640px) {
+  .lc-footer-nav {
+    grid-template-columns: repeat(3, auto);
+  }
+}
+.lc-footer-nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: #fff;
   text-decoration: none;
   font-size: 14px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 10px;
+  transition: background 0.2s, transform 0.15s;
 }
-.lc-footer-links a:hover { text-decoration: underline; }
-.lc-footer-copy {
+.lc-footer-nav-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+.lc-footer-nav-icon {
+  font-size: 16px;
+}
+.lc-footer-bottom {
+  position: relative;
+  z-index: 1;
   max-width: 1280px;
-  margin: 16px auto 0;
+  margin: 24px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.lc-footer-copy {
+  margin: 0;
   font-size: 12px;
-  opacity: 0.7;
-  text-align: center;
+  opacity: 0.85;
+}
+.lc-footer-home {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  opacity: 0.9;
+}
+.lc-footer-home:hover {
+  text-decoration: underline;
+  opacity: 1;
+}
+.qr-lot-master {
+  border: 2px dashed var(--lc-blue);
+  background: linear-gradient(180deg, #f0f7ff 0%, #fff 100%);
 }
 
 /* Home Long Châu */
@@ -1449,7 +1550,10 @@ body.dark-theme .lc-nav a {
   color: #d3e1ff;
 }
 body.dark-theme .lc-footer {
-  background: #0a2540;
+  background: linear-gradient(135deg, #061e33 0%, #0a3050 50%, #0d3d66 100%);
+}
+body.dark-theme .qr-lot-master {
+  background: linear-gradient(180deg, #0f2740 0%, var(--card) 100%);
 }
 
 @media (max-width: 900px) {

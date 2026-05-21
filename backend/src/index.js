@@ -323,14 +323,12 @@ app.post("/api/drugs/offchain", async (req, res) => {
     const qrDataUrl = await QRCode.toDataURL(verifyUrl);
     const persistedDrugImageUrl = await storage.persistImage(drugImageUrl, "drugs", serial);
 
-    const resolvedLotSerial = lotSerial || buildLotSerial(drugId, batch);
-
     const payload = {
       serial,
       drugId,
       drugName: drugName || "",
       batch,
-      lotSerial: resolvedLotSerial,
+      lotSerial: lotSerial || buildLotSerial(drugId, batch),
       materialsUsed,
       expiry,
       manufacturer,
@@ -553,16 +551,12 @@ app.get("/api/verify/:serial", async (req, res) => {
   try {
     const { serial } = req.params;
     let drug = await storage.getDrug(serial);
-    let lotView = false;
     if (!drug) {
       const allItems = await storage.listDrugs();
       const lotBoxes = allItems.filter(
         (item) => (item.lotSerial || buildLotSerial(item.drugId, item.batch)) === serial
       );
-      if (lotBoxes.length > 0) {
-        drug = { ...lotBoxes[0], serial };
-        lotView = true;
-      }
+      if (lotBoxes.length > 0) drug = { ...lotBoxes[0], serial };
     }
     if (!drug) return res.status(404).json({ authentic: false, message: "Không tìm thấy mã thuốc này." });
 
@@ -615,8 +609,6 @@ app.get("/api/verify/:serial", async (req, res) => {
       result: authentic ? "Thuốc chính hãng" : "Nghi ngờ thuốc giả",
       chainHash,
       newHash,
-      lotSerial,
-      lotView,
       drug,
       materialsDetail,
       verifiedAt: new Date().toISOString(),
