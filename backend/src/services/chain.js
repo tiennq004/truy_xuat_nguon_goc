@@ -89,7 +89,11 @@ async function registerDrug(serial, drugHash, owner) {
 
 async function getDrugHash(serial) {
   if (!contract) return chainMemory.drugs.get(serial)?.drugHash ?? null;
-  return contract.getDrugHash(serial);
+  try {
+    return await contract.getDrugHash(serial);
+  } catch (_error) {
+    return null;
+  }
 }
 
 async function drugExists(serial) {

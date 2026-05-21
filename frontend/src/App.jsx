@@ -1092,11 +1092,16 @@ function VerifyPage() {
       const result = await verifyDrug(serial);
       setData(result);
     } catch (e) {
-      const message = e.response?.data?.message || e.response?.data?.error || e.message;
-      if (String(message).includes("Network Error")) {
+      const raw = e.response?.data?.message || e.response?.data?.error || e.message;
+      const message = String(raw || "");
+      if (message.includes("Network Error")) {
         setError(
-          `Không kết nối được backend (${getApiBase()}). Kiểm tra: (1) backend đang chạy: cd backend && npm run dev, (2) restart frontend sau khi sửa, (3) điện thoại mở đúng ${window.location.origin}`
+          `Không kết nối được backend (${getApiBase()}). Kiểm tra backend Render đang chạy và mở đúng ${window.location.origin}`
         );
+      } else if (message.includes("Drug not found") || message.includes("CALL_EXCEPTION")) {
+        setError("Không tra cứu được trên blockchain. Thử quét mã hộp TNDD001-0001 hoặc mã lô dạng TNDD001@ten-lo-sx.");
+      } else if (message.length > 180) {
+        setError("Lỗi hệ thống khi tra cứu. Deploy lại backend bản mới hoặc thử mã hộp cụ thể.");
       } else {
         setError(message);
       }
@@ -1120,7 +1125,10 @@ function VerifyPage() {
       </div>
     <div className="container verify-page">
       <h1>Xác minh thuốc</h1>
-      <p className="status-pill">Serial / mã thuốc: {serial}</p>
+      <p className="status-pill">Mã quét: {serial}</p>
+      {data?.drug?.serial && data.scannedCode !== data.drug.serial && (
+        <p className="muted">Hộp tham chiếu: <b>{data.drug.serial}</b>{data.lotSerial ? ` · Lô chain: ${data.lotSerial}` : ""}</p>
+      )}
       <div className="toolbar">
         <button className="btn-primary" onClick={runVerify} disabled={loading}>
           {loading ? "Đang kiểm tra..." : "Kiểm tra lại"}
