@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, NavLink, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { ethers } from "ethers";
 import {
@@ -43,32 +43,89 @@ async function fileToDataUrl(file) {
   });
 }
 
-function Header({ connectWallet, loadHealth, wallet, health, message, loading, darkMode, toggleDarkMode }) {
+function Footer() {
   return (
-    <header className="header-card">
-      <span className="badge">Pharma Commerce</span>
-      <h1>Hệ thống truy xuất dược phẩm</h1>
-      <p className="muted subtitle">Quản lý nguyên liệu, sản xuất thuốc, phân phối và xác minh bằng QR.</p>
-      <div className="toolbar">
-        <button className="btn-primary" onClick={connectWallet} disabled={loading}>
-          {wallet.connected ? `Ví: ${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}` : "Kết nối MetaMask"}
-        </button>
-        <button className="btn-secondary" onClick={loadHealth}>Kiểm tra hệ thống</button>
-        <button className="btn-secondary" onClick={toggleDarkMode}>
-          {darkMode ? "☀️ Chế độ sáng" : "🌙 Chế độ tối"}
-        </button>
+    <footer className="lc-footer">
+      <div className="lc-footer-inner">
+        <div>
+          <b>Truy xuất dược phẩm</b>
+          <p>Chuỗi cung ứng minh bạch — Blockchain & QR xác minh</p>
+        </div>
+        <div className="lc-footer-links">
+          <Link to="/nguyen-lieu">Nguyên liệu</Link>
+          <Link to="/san-xuat">Sản xuất</Link>
+          <Link to="/kho-qr">Kho QR</Link>
+          <Link to="/xac-minh">Xác minh</Link>
+        </div>
       </div>
-      {health && <p className="status-pill">Lưu trữ: {health.storageMode} | Blockchain: {health.chainMode}</p>}
-      <p className="muted">{wallet.connected ? "Chế độ: Ký giao dịch bằng MetaMask" : "Chế độ: Ký giao dịch bằng backend"}</p>
-      {message && <p className="message-line">{message}</p>}
-      <nav className="tabs">
-        <NavLink to="/" end>🏠 Trang chủ</NavLink>
-        <NavLink to="/nguyen-lieu">🧪 Nguyên liệu</NavLink>
-        <NavLink to="/san-xuat">💊 Sản xuất thuốc</NavLink>
-        <NavLink to="/phan-phoi">🚚 Phân phối</NavLink>
-        <NavLink to="/kho-qr">📱 Kho QR</NavLink>
-        <NavLink to="/xac-minh">🔎 Xác minh QR</NavLink>
+      <p className="lc-footer-copy">© Hệ thống truy xuất nguồn gốc dược phẩm</p>
+    </footer>
+  );
+}
+
+function Header({ connectWallet, loadHealth, wallet, health, message, loading, darkMode, toggleDarkMode }) {
+  const navigate = useNavigate();
+  const [searchSerial, setSearchSerial] = useState("");
+
+  function onSearch(e) {
+    e.preventDefault();
+    const serial = searchSerial.trim();
+    if (serial) navigate(`/verify/${encodeURIComponent(serial)}`);
+  }
+
+  return (
+    <header className="lc-header">
+      <div className="lc-topbar">
+        <span>⛓️ Truy xuất nguồn gốc thuốc — Blockchain Sepolia</span>
+        <span className="lc-topbar-right">
+          {health ? `Lưu trữ: ${health.storageMode} · Chain: ${health.chainMode}` : "Đang kết nối hệ thống..."}
+        </span>
+      </div>
+      <div className="lc-mainbar">
+        <Link to="/" className="lc-brand">
+          <span className="lc-logo">+</span>
+          <div>
+            <b>Truy xuất</b>
+            <small>Dược phẩm</small>
+          </div>
+        </Link>
+        <form className="lc-search" onSubmit={onSearch}>
+          <span className="lc-search-icon">🔍</span>
+          <input
+            value={searchSerial}
+            onChange={(e) => setSearchSerial(e.target.value)}
+            placeholder="Nhập mã thuốc / serial để xác minh..."
+          />
+          <button type="submit" className="lc-search-btn">
+            Tra cứu
+          </button>
+        </form>
+        <div className="lc-actions">
+          <button type="button" className="lc-action-btn" onClick={connectWallet} disabled={loading}>
+            <span>👤</span>
+            {wallet.connected ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}` : "MetaMask"}
+          </button>
+          <button type="button" className="lc-action-btn" onClick={loadHealth}>
+            <span>⚙️</span>
+            Hệ thống
+          </button>
+          <button type="button" className="lc-action-btn lc-cart" onClick={toggleDarkMode} title="Đổi giao diện">
+            <span>{darkMode ? "☀️" : "🌙"}</span>
+          </button>
+        </div>
+      </div>
+      <nav className="lc-nav">
+        <NavLink to="/" end>Trang chủ</NavLink>
+        <NavLink to="/nguyen-lieu">Nguyên liệu</NavLink>
+        <NavLink to="/san-xuat">Sản xuất thuốc</NavLink>
+        <NavLink to="/phan-phoi">Phân phối</NavLink>
+        <NavLink to="/kho-qr">Kho QR</NavLink>
+        <NavLink to="/xac-minh">Xác minh QR</NavLink>
       </nav>
+      {message && <div className="lc-alert">{message}</div>}
+      <p className="lc-mode-hint muted">
+        {wallet.connected ? "Chế độ: Ký giao dịch bằng MetaMask" : "Chế độ: Ký giao dịch bằng backend"}
+      </p>
     </header>
   );
 }
@@ -97,112 +154,123 @@ function HomePage() {
 
   return (
     <div className="home-shell">
-      <div className="card home-banner">
-        <div className="banner-main">
-          <p className="muted">
-            <span className="tiny-icon">🛍️</span>
-            Nền tảng chuỗi cung ứng dược
-          </p>
-          <h2 className="home-title">Theo dõi sản xuất, phân phối và xác minh thuốc theo thời gian thực</h2>
-          <p className="muted">Mô hình giao diện dạng sàn: rõ luồng, nổi bật trạng thái, thao tác nhanh theo từng bước.</p>
-          <div className="banner-tags">
-            <span>Realtime trạng thái</span>
-            <span>Chuẩn hóa QR</span>
-            <span>Giảm thao tác tay</span>
-          </div>
-        </div>
-        <div className="home-stats">
-          <article>
-            <b>{featuredProducts.length}</b>
-            <span>Sản phẩm đã tạo</span>
-          </article>
-          <article>
-            <b>4</b>
-            <span>Bước truy xuất</span>
-          </article>
-          <article>
-            <b>QR</b>
-            <span>Xác minh tức thì</span>
-          </article>
-        </div>
-        <div className="floating-icon floating-icon-a">💊</div>
-        <div className="floating-icon floating-icon-b">🔎</div>
-      </div>
-
-      <div className="grid home-grid">
-        <div className="card diagram-card">
-          <h2><span className="section-icon">🧭</span>Sơ đồ quy trình</h2>
-          <div className="diagram-flow">
-            <div className="diagram-step">🧪 Đăng ký nguyên liệu</div>
-            <span>➜</span>
-            <div className="diagram-step">💊 Tạo serial thuốc</div>
-            <span>➜</span>
-            <div className="diagram-step">🚚 Chuyển giao</div>
-            <span>➜</span>
-            <div className="diagram-step">🔎 Quét QR xác minh</div>
-          </div>
-        </div>
-
-        <div className="card diagram-card">
-          <h2><span className="section-icon">✨</span>Sơ đồ thao tác gợi ý</h2>
-          <div className="diagram-columns">
+      <section className="lc-hero-row">
+        <div className="lc-hero-banner">
+          <span className="lc-hero-tag">Chuỗi cung ứng minh bạch</span>
+          <h2>Theo dõi sản xuất, phân phối và xác minh thuốc theo thời gian thực</h2>
+          <p>Quản lý nguyên liệu, lô thuốc, QR truy xuất và xác thực blockchain — một nền tảng thống nhất.</p>
+          <div className="lc-hero-stats">
             <article>
-              <h3>B1: Nhập nguyên liệu</h3>
-              <p>Mã, xuất xứ, chứng nhận, ảnh.</p>
+              <b>{featuredProducts.length}</b>
+              <span>Sản phẩm đã tạo</span>
             </article>
             <article>
-              <h3>B2: Chọn nguyên liệu</h3>
-              <p>Gán vào lô thuốc và số lượng serial.</p>
+              <b>5</b>
+              <span>Bước truy xuất</span>
             </article>
             <article>
-              <h3>B3: Theo dõi phân phối</h3>
-              <p>Cập nhật trạng thái và chủ sở hữu.</p>
+              <b>QR</b>
+              <span>Xác minh tức thì</span>
             </article>
           </div>
         </div>
-
-        <div className="card diagram-card highlight">
-          <h2><span className="section-icon">🎬</span>Sơ đồ trải nghiệm người dùng</h2>
-          <div className="experience-track">
-            <div>🦊 MetaMask ký giao dịch</div>
-            <div>☁️ Firebase lưu dữ liệu đầy đủ</div>
-            <div>⛓️ Blockchain lưu hash chống sửa</div>
-            <div>📱 QR check tại điểm bán</div>
-          </div>
+        <div className="lc-quick-actions">
+          <Link to="/san-xuat" className="lc-quick-card">
+            <span className="lc-quick-icon">💊</span>
+            <div>
+              <b>Tạo thuốc & QR</b>
+              <p>Đăng ký lô sản xuất mới</p>
+            </div>
+          </Link>
+          <Link to="/xac-minh" className="lc-quick-card">
+            <span className="lc-quick-icon">🔎</span>
+            <div>
+              <b>Xác minh QR</b>
+              <p>Tra cứu nguồn gốc thuốc</p>
+            </div>
+          </Link>
+          <Link to="/phan-phoi" className="lc-quick-card">
+            <span className="lc-quick-icon">🚚</span>
+            <div>
+              <b>Cập nhật phân phối</b>
+              <p>Trạng thái chuỗi cung ứng</p>
+            </div>
+          </Link>
         </div>
-      </div>
+      </section>
 
-      <div className="card featured-wide">
-        <h2><span className="section-icon">🔥</span>Sản phẩm nổi bật (dữ liệu thật)</h2>
+      <section className="lc-section">
+        <div className="lc-section-head">
+          <h2 className="lc-tab-title">Sản phẩm đã đăng ký</h2>
+          <Link to="/kho-qr" className="lc-see-all">Xem kho QR →</Link>
+        </div>
         {loadError && <p className="bad">Không kết nối API ({getApiBase()}): {loadError}</p>}
         {featuredProducts.length === 0 ? (
           <div className="empty-products">
             <p>Chưa có sản phẩm nào để hiển thị.</p>
-            <p className="muted">Khi bạn tạo thuốc ở trang Sản xuất thuốc, mục này sẽ tự động cập nhật.</p>
+            <p className="muted">Vào <Link to="/san-xuat">Sản xuất thuốc</Link> để tạo mã và QR mới.</p>
           </div>
         ) : (
-          <div className="product-grid">
+          <div className="lc-product-grid">
             {featuredProducts.map((product) => (
-              <article className="product-item" key={product.serial}>
-                {product.drugImageUrl ? (
-                  <img src={product.drugImageUrl} alt={product.drugName || product.drugId} className="product-image" />
-                ) : (
-                  <div className="product-image product-image-placeholder">NO IMAGE</div>
-                )}
-                <div className="product-content">
-                  <span className={`product-badge ${normalizeStatus(product.status) === "Sold" ? "" : "pending"}`}>
-                    {getStatusLabel(product.status)}
-                  </span>
-                  <h3>{product.drugName || product.drugId}</h3>
-                  <p>Serial: {product.serial}</p>
-                  <p>Lô: {product.batch || "N/A"} • HSD: {product.expiry || "N/A"}</p>
-                  <p>Nhà SX: {product.manufacturer || "N/A"}</p>
+              <article className="lc-product-card" key={product.serial}>
+                <div className="lc-product-img-wrap">
+                  {product.drugImageUrl ? (
+                    <img src={product.drugImageUrl} alt={product.drugName || product.drugId} />
+                  ) : (
+                    <div className="product-image-placeholder">💊</div>
+                  )}
                 </div>
+                <h3>{product.drugName || product.drugId}</h3>
+                <p className="lc-product-price">Mã: {product.serial}</p>
+                <span className={`lc-product-unit ${normalizeStatus(product.status) === "Sold" ? "sold" : ""}`}>
+                  {getStatusLabel(product.status)}
+                </span>
+                <Link to={`/verify/${product.serial}`} className="lc-product-link">
+                  Xác minh →
+                </Link>
               </article>
             ))}
           </div>
         )}
-      </div>
+      </section>
+
+      <section className="lc-health-block">
+        <div className="lc-health-text">
+          <h2>Kiểm tra nguồn gốc thuốc</h2>
+          <p>Quét mã QR trên bao bì để xem lịch sử phân phối, nguyên liệu và xác thực blockchain.</p>
+        </div>
+        <div className="lc-health-cards">
+          <Link to="/verify/MAU_THUOC" className="lc-health-item">
+            <span>🔎</span>
+            <b>Tra cứu mẫu</b>
+            <small>Mở trang xác minh</small>
+          </Link>
+          <Link to="/nguyen-lieu" className="lc-health-item">
+            <span>🧪</span>
+            <b>Nguyên liệu</b>
+            <small>Đăng ký & quản lý</small>
+          </Link>
+          <Link to="/kho-qr" className="lc-health-item">
+            <span>📱</span>
+            <b>Kho QR</b>
+            <small>In & quét mã</small>
+          </Link>
+        </div>
+      </section>
+
+      <section className="lc-process-row card">
+        <h2>Quy trình truy xuất</h2>
+        <div className="diagram-flow">
+          <div className="diagram-step">🧪 Nguyên liệu</div>
+          <span>➜</span>
+          <div className="diagram-step">💊 Sản xuất</div>
+          <span>➜</span>
+          <div className="diagram-step">🚚 Phân phối</div>
+          <span>➜</span>
+          <div className="diagram-step">🔎 Xác minh QR</div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -678,7 +746,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="container">
+    <div className="app-shell">
       <Header
         connectWallet={connectWallet}
         loadHealth={loadHealth}
@@ -689,7 +757,7 @@ function Dashboard() {
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
       />
-      <div className="page-transition" key={location.pathname}>
+      <main className="lc-main container page-transition" key={location.pathname}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/nguyen-lieu" element={<MaterialPage submitMaterial={submitMaterial} />} />
@@ -698,7 +766,8 @@ function Dashboard() {
           <Route path="/kho-qr" element={<QrLibraryPage />} />
           <Route path="/xac-minh" element={<VerifyHubPage createdDrug={createdDrug} />} />
         </Routes>
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 }
@@ -762,6 +831,12 @@ function VerifyPage() {
   }, [serial]);
 
   return (
+    <div className="verify-page-wrap">
+      <div className="lc-topbar-verify">
+        <Link to="/" className="lc-brand-mini">
+          <span className="lc-logo">+</span> Truy xuất dược phẩm
+        </Link>
+      </div>
     <div className="container verify-page">
       <h1>Xác minh thuốc</h1>
       <p className="status-pill">Serial / mã thuốc: {serial}</p>
@@ -854,6 +929,7 @@ function VerifyPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }
