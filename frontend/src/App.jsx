@@ -751,7 +751,7 @@ function SellerPage({ wallet, connectWallet, submitSale, loading }) {
         <input
           value={sellerLabel}
           onChange={(e) => setSellerLabel(e.target.value)}
-          placeholder="Tên điểm bán"
+          placeholder="Tên điểm bán (vd. Nhà thuốc Long Châu)"
         />
         <button className="btn-primary" type="submit" disabled={loading || !serial.trim()}>
           Xác nhận đã bán
@@ -946,8 +946,7 @@ function Dashboard() {
       }
 
       const address = wallet.connected ? (await getSignerAndContract()).address : "";
-      const data = await sellDrugBoxOffchain({
-        serial,
+      const data = await sellDrugBoxOffchain(serial, {
         sellerAddress: address,
         sellerLabel: sellerLabel || "Điểm bán",
         buyerAddress: address,
