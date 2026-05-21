@@ -56,6 +56,18 @@ export function checkDrugSerials(drugId, quantity) {
     .then((r) => r.data);
 }
 
+export function listDrugGroups() {
+  return api.get("/drugs/groups").then((r) => r.data);
+}
+
+export function sellDrugBox(serial, payload) {
+  return api.post(`/drugs/${serial}/sell`, payload).then((r) => r.data);
+}
+
+export function sellDrugBoxOffchain(serial, payload) {
+  return api.post(`/drugs/${serial}/sell/offchain`, payload).then((r) => r.data);
+}
+
 export function createDrugOffchain(payload) {
   return api.post("/drugs/offchain", payload).then((r) => r.data);
 }

@@ -735,6 +735,73 @@ a:hover { color: var(--lc-blue-light); }
   margin: 4px 0 0;
 }
 
+.qr-group-list {
+  display: grid;
+  gap: 12px;
+}
+.qr-group-card {
+  padding: 0;
+  overflow: hidden;
+}
+.qr-group-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border: none;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+}
+.qr-group-header h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  color: var(--lc-blue);
+}
+.qr-group-chevron {
+  font-size: 14px;
+  color: var(--lc-muted);
+}
+.qr-group-boxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--lc-border);
+  background: #fff;
+}
+.qr-box-item {
+  border: 1px solid var(--lc-border);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+  background: #fafbfc;
+}
+.qr-box-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.seller-card ol.seller-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--lc-muted);
+  font-size: 14px;
+}
+.seller-card ol.seller-steps li {
+  margin-bottom: 8px;
+}
+.seller-connect {
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff8f0;
+  border: 1px solid #ffd8a8;
+}
+
 .qr-library-page {
   display: grid;
   gap: 14px;

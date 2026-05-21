@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const os = require("os");
 const QRCode = require("qrcode");
 const { sha256FromParts } = require("./utils/hash");
+const { buildBoxSerials, MAX_BOX_QUANTITY } = require("./utils/serials");
 const storage = require("./services/storage");
 const chain = require("./services/chain");
 
@@ -155,50 +156,69 @@ app.post("/api/materials/offchain", async (req, res) => {
 
 app.post("/api/drugs", async (req, res) => {
   try {
-    const { drugId, drugName, batch, materialsUsed, expiry, manufacturer, drugImageUrl, verifyBase } = req.body;
+    const { drugId, drugName, batch, materialsUsed, expiry, manufacturer, drugImageUrl, verifyBase, quantity } =
+      req.body;
     if (!drugId || !batch || !Array.isArray(materialsUsed) || materialsUsed.length === 0) {
       return res.status(400).json({ error: "drugId, batch, materialsUsed are required" });
     }
 
-    // One drug type maps to one unique QR/serial.
-    const serial = String(drugId).trim();
-    const existingOffchain = await storage.getDrug(serial);
-    const existingOnchain = await chain.drugExists(serial);
-    if (existingOffchain || existingOnchain) {
+    const serials = buildBoxSerials(drugId, quantity);
+    const existingSerials = [];
+    for (const serial of serials) {
+      // eslint-disable-next-line no-await-in-loop
+      const existingOffchain = await storage.getDrug(serial);
+      // eslint-disable-next-line no-await-in-loop
+      const existingOnchain = await chain.drugExists(serial);
+      if (existingOffchain || existingOnchain) existingSerials.push(serial);
+    }
+    if (existingSerials.length > 0) {
       return res.status(409).json({
-        error: `Drug serial already exists: ${serial}`,
-        serial,
-        source: existingOffchain ? "offchain" : "onchain",
+        error: `Some box serials already exist (${existingSerials.length}/${serials.length})`,
+        existingSerials: existingSerials.slice(0, 20),
+        source: "mixed",
       });
     }
 
-    const drugHash = sha256FromParts([drugId, materialsUsed.join(","), batch]);
-    const verifyUrl = buildVerifyUrl(serial, verifyBase);
-    const qrDataUrl = await QRCode.toDataURL(verifyUrl);
-    const persistedDrugImageUrl = await storage.persistImage(drugImageUrl, "drugs", serial);
+    const persistedDrugImageUrl = await storage.persistImage(drugImageUrl, "drugs", String(drugId).trim());
+    const items = [];
+    const owner = manufacturer || "manufacturer";
 
-    const payload = {
-      serial,
-      drugId,
-      drugName: drugName || "",
-      batch,
-      materialsUsed,
-      expiry,
-      manufacturer,
-      drugImageUrl: persistedDrugImageUrl || "",
-      currentOwner: manufacturer || "manufacturer",
-      status: "Manufacturer",
-      history: [{ status: "Manufacturer", owner: manufacturer || "manufacturer", at: new Date().toISOString() }],
-      drugHash,
-      verifyUrl,
-      qrDataUrl,
+    for (const serial of serials) {
+      const drugHash = sha256FromParts([drugId, materialsUsed.join(","), batch, serial]);
+      const verifyUrl = buildVerifyUrl(serial, verifyBase);
+      // eslint-disable-next-line no-await-in-loop
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl);
+      const payload = {
+        serial,
+        drugId: String(drugId).trim(),
+        drugName: drugName || "",
+        batch,
+        materialsUsed,
+        expiry,
+        manufacturer,
+        drugImageUrl: persistedDrugImageUrl || "",
+        currentOwner: owner,
+        status: "Manufacturer",
+        history: [{ status: "Manufacturer", owner, at: new Date().toISOString() }],
+        drugHash,
+        verifyUrl,
+        qrDataUrl,
+      boxIndex: Number(serial.split("-").pop()) || 0,
     };
+      // eslint-disable-next-line no-await-in-loop
+      const chainResult = await chain.registerDrug(serial, drugHash, owner);
+      // eslint-disable-next-line no-await-in-loop
+      await storage.saveDrug({ ...payload, txHash: chainResult.txHash });
+      items.push({ ...payload, txHash: chainResult.txHash });
+    }
 
-    const chainResult = await chain.registerDrug(serial, drugHash, manufacturer || "manufacturer");
-    const persisted = { ...payload, txHash: chainResult.txHash };
-    await storage.saveDrug(persisted);
-
-    res.status(201).json({ count: 1, items: [persisted] });
+    res.status(201).json({
+      count: items.length,
+      drugId: String(drugId).trim(),
+      quantity: items.length,
+      maxQuantity: MAX_BOX_QUANTITY,
+      items,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -217,17 +237,58 @@ app.get("/api/drugs", async (_req, res) => {
 app.get("/api/drugs/check-serials", async (req, res) => {
   try {
     const drugId = String(req.query.drugId || "").trim();
+    const quantity = req.query.quantity;
     if (!drugId) {
       return res.status(400).json({ error: "drugId is required" });
     }
 
+    const serials = buildBoxSerials(drugId, quantity);
     const existingSerials = [];
-    const serial = drugId;
-    const existingOffchain = await storage.getDrug(serial);
-    const existingOnchain = await chain.drugExists(serial);
-    if (existingOffchain || existingOnchain) existingSerials.push(serial);
+    for (const serial of serials) {
+      // eslint-disable-next-line no-await-in-loop
+      const existingOffchain = await storage.getDrug(serial);
+      // eslint-disable-next-line no-await-in-loop
+      const existingOnchain = await chain.drugExists(serial);
+      if (existingOffchain || existingOnchain) existingSerials.push(serial);
+    }
 
-    res.json({ available: existingSerials.length === 0, existingSerials });
+    res.json({
+      available: existingSerials.length === 0,
+      existingSerials,
+      plannedSerials: serials,
+      quantity: serials.length,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/drugs/groups", async (_req, res) => {
+  try {
+    const items = await storage.listDrugs();
+    const groupsMap = new Map();
+    for (const item of items) {
+      const key = item.drugId || item.serial;
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          drugId: key,
+          drugName: item.drugName || key,
+          batch: item.batch,
+          manufacturer: item.manufacturer,
+          drugImageUrl: item.drugImageUrl,
+          boxes: [],
+        });
+      }
+      groupsMap.get(key).boxes.push(item);
+    }
+    const groups = Array.from(groupsMap.values()).map((g) => {
+      g.boxes.sort((a, b) => String(a.serial).localeCompare(String(b.serial)));
+      g.total = g.boxes.length;
+      g.soldCount = g.boxes.filter((b) => b.status === "Sold").length;
+      return g;
+    });
+    groups.sort((a, b) => String(b.drugId).localeCompare(String(a.drugId)));
+    res.json({ count: groups.length, groups });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -305,6 +366,83 @@ app.post("/api/drugs/:serial/transfer", async (req, res) => {
   }
 });
 
+app.post("/api/drugs/:serial/sell", async (req, res) => {
+  try {
+    const { serial } = req.params;
+    const { sellerAddress, sellerLabel, buyerAddress } = req.body;
+    const drug = await storage.getDrug(serial);
+    if (!drug) return res.status(404).json({ error: "Drug not found" });
+    if (drug.status === "Sold") {
+      return res.status(409).json({ error: "Hộp thuốc này đã được đánh dấu đã bán." });
+    }
+
+    const toAddress = String(buyerAddress || sellerAddress || "").trim();
+    if (!/^0x[a-fA-F0-9]{40}$/.test(toAddress)) {
+      return res.status(400).json({
+        error: "sellerAddress hoặc buyerAddress phải là địa chỉ ví 0x... (42 ký tự).",
+      });
+    }
+
+    const chainResult = await chain.transferDrug(serial, sellerLabel || "seller", toAddress, "Sold");
+    const next = {
+      ...drug,
+      status: "Sold",
+      currentOwner: sellerLabel || drug.currentOwner,
+      soldTo: toAddress,
+      soldAt: new Date().toISOString(),
+      history: [
+        ...drug.history,
+        {
+          status: "Sold",
+          owner: sellerLabel || "seller",
+          to: toAddress,
+          at: new Date().toISOString(),
+        },
+      ],
+    };
+    await storage.saveDrug(next);
+    res.json({ ...next, txHash: chainResult.txHash });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/drugs/:serial/sell/offchain", async (req, res) => {
+  try {
+    const { serial } = req.params;
+    const { sellerAddress, sellerLabel, buyerAddress, txHash } = req.body;
+    const drug = await storage.getDrug(serial);
+    if (!drug) return res.status(404).json({ error: "Drug not found" });
+    if (drug.status === "Sold") {
+      return res.status(409).json({ error: "Hộp thuốc này đã được đánh dấu đã bán." });
+    }
+
+    const toAddress = String(buyerAddress || sellerAddress || "").trim();
+    const next = {
+      ...drug,
+      status: "Sold",
+      currentOwner: sellerLabel || drug.currentOwner,
+      soldTo: toAddress,
+      soldAt: new Date().toISOString(),
+      txHash: txHash || drug.txHash || "",
+      history: [
+        ...drug.history,
+        {
+          status: "Sold",
+          owner: sellerLabel || "seller",
+          to: toAddress,
+          at: new Date().toISOString(),
+          txHash: txHash || "",
+        },
+      ],
+    };
+    await storage.saveDrug(next);
+    res.json(next);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/api/drugs/:serial/transfer/offchain", async (req, res) => {
   try {
     const { serial } = req.params;
@@ -333,9 +471,10 @@ app.get("/api/verify/:serial", async (req, res) => {
     const drug = await storage.getDrug(serial);
     if (!drug) return res.status(404).json({ authentic: false, message: "Không tìm thấy mã thuốc này." });
 
-    const newHash = sha256FromParts([drug.drugId, drug.materialsUsed.join(","), drug.batch]);
+    const newHash = sha256FromParts([drug.drugId, drug.materialsUsed.join(","), drug.batch, drug.serial]);
+    const legacyHash = sha256FromParts([drug.drugId, drug.materialsUsed.join(","), drug.batch]);
     const chainHash = await chain.getDrugHash(serial);
-    const authentic = chainHash === newHash;
+    const authentic = chainHash === newHash || chainHash === legacyHash;
 
     const materialsDetail = [];
     for (const materialId of drug.materialsUsed || []) {
