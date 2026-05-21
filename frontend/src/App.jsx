@@ -540,7 +540,6 @@ function DistributionPage({ submitTransferBulk, loading }) {
   return (
     <form onSubmit={onSubmit} className="card form-card page-panel">
       <h2><span className="section-icon">🚚</span>Phân phối theo lô</h2>
-      <p className="muted">Chọn lô sản xuất — 1 lần Confirm MetaMask cho cả lô.</p>
       {loadError && <p className="bad">{loadError}</p>}
       <select
         value={transfer.lotSerial}
@@ -736,7 +735,7 @@ function SellerPage({ wallet, connectWallet, submitSale, loading }) {
             <ol className="seller-steps">
               <li>Phân phối chuyển hộp tới ví nhà thuốc (địa chỉ 0x...).</li>
               <li>Khách mua 1 hộp → quét QR trên hộp đó.</li>
-              <li>Nhập đúng mã hộp → Xác nhận → Confirm MetaMask.</li>
+              <li>Nhập mã hộp trên QR → Xác nhận đã bán.</li>
               <li>
                 Quét lại QR → hiển thị <b>Đã bán</b> (chỉ hộp đó).
               </li>
@@ -953,10 +952,15 @@ function Dashboard() {
         buyerAddress: address,
         txHash: "",
       });
-      setMessage(`Đã xác nhận bán hộp ${serial}. Trạng thái: ${getStatusLabel(data.status)}.`);
+      setMessage(`Đã xác nhận bán hộp ${data.serial || serial}. Trạng thái: ${getStatusLabel(data.status)}.`);
     } catch (error) {
-      const text = String(error?.message || "");
-      if (text.includes("Only current owner")) {
+      const text =
+        error.response?.data?.error || error.response?.data?.message || String(error?.message || "");
+      if (error.response?.status === 404) {
+        setMessage("Không tìm thấy hộp. Quét QR trên vỏ hộp và nhập mã dạng TNDD001-0001.");
+      } else if (error.response?.status === 400) {
+        setMessage(text);
+      } else if (text.includes("Only current owner")) {
         setMessage("Ví MetaMask không phải chủ hộp này. Chuyển giao tới ví nhà thuốc trước khi bán.");
       } else if (text.includes("đã được đánh dấu") || text.includes("Sold")) {
         setMessage("Hộp này đã được đánh dấu đã bán.");

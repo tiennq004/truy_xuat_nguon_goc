@@ -36,6 +36,42 @@ function buildVerifyUrl(serial, verifyBase) {
   return `${base}/${encodeURIComponent(serial)}`;
 }
 
+async function resolveDrugRecord(serial, { unsoldOnly } = {}) {
+  const code = decodeURIComponent(String(serial || "").trim());
+  if (!code) return null;
+
+  let drug = await storage.getDrug(code);
+  if (drug && (!unsoldOnly || drug.status !== "Sold")) return drug;
+
+  const allItems = await storage.listDrugs();
+  const lotBoxes = allItems.filter(
+    (item) => (item.lotSerial || buildLotSerial(item.drugId, item.batch)) === code
+  );
+  const pool = (list) =>
+    list.filter((item) => !unsoldOnly || item.status !== "Sold").sort((a, b) => String(a.serial).localeCompare(String(b.serial)));
+
+  if (lotBoxes.length > 0) {
+    const pick = pool(lotBoxes);
+    if (pick.length === 1) return pick[0];
+    if (pick.length > 1) return { ambiguous: true, count: pick.length, examples: pick.slice(0, 3).map((x) => x.serial) };
+    return null;
+  }
+
+  const byDrugId = pool(allItems.filter((item) => String(item.drugId || "").trim() === code));
+  if (byDrugId.length === 1) return byDrugId[0];
+  if (byDrugId.length > 1) {
+    return { ambiguous: true, count: byDrugId.length, examples: byDrugId.slice(0, 3).map((x) => x.serial) };
+  }
+
+  const byPrefix = pool(allItems.filter((item) => String(item.serial || "").startsWith(`${code}-`)));
+  if (byPrefix.length === 1) return byPrefix[0];
+  if (byPrefix.length > 1) {
+    return { ambiguous: true, count: byPrefix.length, examples: byPrefix.slice(0, 3).map((x) => x.serial) };
+  }
+
+  return drug || null;
+}
+
 function getLanIps() {
   const nets = os.networkInterfaces();
   const ips = [];
@@ -520,8 +556,16 @@ app.post("/api/drugs/:serial/sell/offchain", async (req, res) => {
   try {
     const { serial } = req.params;
     const { sellerAddress, sellerLabel, buyerAddress, txHash } = req.body;
-    const drug = await storage.getDrug(serial);
-    if (!drug) return res.status(404).json({ error: "Drug not found" });
+    const resolved = await resolveDrugRecord(serial, { unsoldOnly: true });
+    if (!resolved) {
+      return res.status(404).json({ error: "Không tìm thấy hộp thuốc. Nhập mã hộp vd TNDD001-0001." });
+    }
+    if (resolved.ambiguous) {
+      return res.status(400).json({
+        error: `Có ${resolved.count} hộp chưa bán. Nhập đúng mã hộp, vd: ${resolved.examples.join(", ")}`,
+      });
+    }
+    const drug = resolved;
     if (drug.status === "Sold") {
       return res.status(409).json({ error: "Hộp thuốc này đã được đánh dấu đã bán." });
     }
@@ -531,14 +575,14 @@ app.post("/api/drugs/:serial/sell/offchain", async (req, res) => {
       ...drug,
       status: "Sold",
       currentOwner: sellerLabel || drug.currentOwner,
-      soldTo: toAddress,
+      soldTo: toAddress || drug.soldTo || "",
       soldAt: new Date().toISOString(),
       txHash: txHash || drug.txHash || "",
       history: [
-        ...drug.history,
+        ...(Array.isArray(drug.history) ? drug.history : []),
         {
           status: "Sold",
-          owner: sellerLabel || "seller",
+          owner: sellerLabel || "Điểm bán",
           to: toAddress,
           at: new Date().toISOString(),
           txHash: txHash || "",
