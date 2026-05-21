@@ -313,7 +313,7 @@ function MaterialPage({ submitMaterial }) {
   );
 }
 
-function DrugPage({ submitDrug, createdBatch, phoneScanReady }) {
+function DrugPage({ submitDrug, phoneScanReady }) {
   const [materialOptions, setMaterialOptions] = useState([]);
   const [materialsLoadError, setMaterialsLoadError] = useState("");
   const [selectedMaterialId, setSelectedMaterialId] = useState("");
@@ -376,8 +376,8 @@ function DrugPage({ submitDrug, createdBatch, phoneScanReady }) {
   }
 
   return (
-    <div className="grid page-split">
-      <form onSubmit={onSubmit} className="card form-card">
+    <div className="seller-page-wrap">
+      <form onSubmit={onSubmit} className="card form-card page-panel">
         <h2><span className="section-icon">🏭</span>Sản xuất thuốc</h2>
         <input value={drug.drugId} onChange={(e) => setDrug({ ...drug, drugId: e.target.value })} placeholder="Mã thuốc" />
         <input value={drug.drugName} onChange={(e) => setDrug({ ...drug, drugName: e.target.value })} placeholder="Tên thuốc" />
@@ -440,22 +440,6 @@ function DrugPage({ submitDrug, createdBatch, phoneScanReady }) {
           Tạo {drug.quantity || 1} mã QR (từng hộp)
         </button>
       </form>
-      <div className="card qr-card">
-        <h2><span className="section-icon">📦</span>QR từng hộp</h2>
-        {createdBatch ? (
-          <>
-            <p className="ok">
-              Đã tạo <b>{createdBatch.count}</b> QR cho <b>{createdBatch.drugId}</b>.
-            </p>
-            <p className="muted">Ví dụ hộp 1:</p>
-            <QRCodeSVG value={buildVerifyUrl(createdBatch.items[0]?.serial)} size={180} />
-            <p className="mono">{createdBatch.items[0]?.serial}</p>
-            <Link to="/kho-qr">Mở Kho QR xem & in tất cả hộp →</Link>
-          </>
-        ) : (
-          <p className="muted">Tạo thuốc xong — mỗi hộp một QR trong Kho QR.</p>
-        )}
-      </div>
     </div>
   );
 }
@@ -813,11 +797,13 @@ function Dashboard() {
         }
         const batch = { drugId: drug.drugId, count: items.length, items };
         setCreatedBatch(batch);
-        setMessage(`Đã tạo ${items.length} QR (${items[0]?.serial} … ${items[items.length - 1]?.serial}). Vào Kho QR để in.`);
+        setMessage(
+          `Đã tạo ${items.length} QR (${items[0]?.serial} … ${items[items.length - 1]?.serial}). Vào trang Kho QR để xem và in từng hộp.`
+        );
       } else {
         const data = await createDrug({ ...drug, materialsUsed, quantity, verifyBase: getVerifyBase() });
         setCreatedBatch({ drugId: data.drugId, count: data.count, items: data.items });
-        setMessage(`Đã tạo ${data.count} mã QR bằng backend. Vào Kho QR để xem từng hộp.`);
+        setMessage(`Đã tạo ${data.count} mã QR bằng backend. Vào trang Kho QR để xem từng hộp.`);
       }
     } catch (error) {
       const text = String(error?.message || "");
@@ -923,7 +909,7 @@ function Dashboard() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/nguyen-lieu" element={<MaterialPage submitMaterial={submitMaterial} />} />
-          <Route path="/san-xuat" element={<DrugPage submitDrug={submitDrug} createdBatch={createdBatch} phoneScanReady={phoneScanReady} />} />
+          <Route path="/san-xuat" element={<DrugPage submitDrug={submitDrug} phoneScanReady={phoneScanReady} />} />
           <Route path="/phan-phoi" element={<DistributionPage submitTransfer={submitTransfer} />} />
           <Route path="/kho-qr" element={<QrLibraryPage />} />
           <Route
