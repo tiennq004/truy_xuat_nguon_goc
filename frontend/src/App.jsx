@@ -572,13 +572,13 @@ function DistributionPage({ submitTransferBulk, loading }) {
       <input
         value={transfer.to}
         onChange={(e) => setTransfer({ ...transfer, to: e.target.value })}
-        placeholder="Bên nhận — địa chỉ ví 0x..."
+        placeholder="Bên nhận"
         required
       />
       <select value={transfer.status} onChange={(e) => setTransfer({ ...transfer, status: e.target.value })}>
-        <option value="Distributor">→ Nhà phân phối</option>
-        <option value="Hospital">→ Bệnh viện</option>
-        <option value="Pharmacy">→ Nhà thuốc</option>
+        <option value="Distributor">Nhà phân phối</option>
+        <option value="Hospital">Bệnh viện</option>
+        <option value="Pharmacy">Nhà thuốc</option>
       </select>
       <button
         className="btn-primary"
@@ -751,7 +751,7 @@ function SellerPage({ wallet, connectWallet, submitSale, loading }) {
         <input
           value={sellerLabel}
           onChange={(e) => setSellerLabel(e.target.value)}
-          placeholder="Tên điểm bán (vd. Nhà thuốc Long Châu)"
+          placeholder="Tên điểm bán"
         />
         <button className="btn-primary" type="submit" disabled={loading || !serial.trim()}>
           Xác nhận đã bán
