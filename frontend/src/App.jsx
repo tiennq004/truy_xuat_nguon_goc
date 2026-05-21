@@ -126,10 +126,12 @@ function Header({ connectWallet, loadHealth, wallet, health, message, loading, d
         <NavLink to="/nguoi-ban">Người bán</NavLink>
         <NavLink to="/xac-minh">Xác minh QR</NavLink>
       </nav>
-      {message && <div className="lc-alert">{message}</div>}
-      <p className="lc-mode-hint muted">
-        {wallet.connected ? "Chế độ: Ký giao dịch bằng MetaMask" : "Chế độ: Ký giao dịch bằng backend"}
-      </p>
+      <div className="lc-header-meta">
+        {message && <div className="lc-alert">{message}</div>}
+        <p className="lc-mode-hint muted">
+          {wallet.connected ? "Chế độ: Ký giao dịch bằng MetaMask" : "Chế độ: Ký giao dịch bằng backend"}
+        </p>
+      </div>
     </header>
   );
 }
@@ -297,7 +299,7 @@ function MaterialPage({ submitMaterial }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="card form-card">
+    <form onSubmit={onSubmit} className="card form-card page-panel">
       <h2><span className="section-icon">🧪</span>Nguyên liệu</h2>
       <input value={material.materialId} onChange={(e) => setMaterial({ ...material, materialId: e.target.value })} placeholder="Mã nguyên liệu" />
       <input value={material.name} onChange={(e) => setMaterial({ ...material, name: e.target.value })} placeholder="Tên nguyên liệu" />
@@ -374,7 +376,7 @@ function DrugPage({ submitDrug, createdBatch, phoneScanReady }) {
   }
 
   return (
-    <div className="grid">
+    <div className="grid page-split">
       <form onSubmit={onSubmit} className="card form-card">
         <h2><span className="section-icon">🏭</span>Sản xuất thuốc</h2>
         <input value={drug.drugId} onChange={(e) => setDrug({ ...drug, drugId: e.target.value })} placeholder="Mã thuốc" />
@@ -388,10 +390,6 @@ function DrugPage({ submitDrug, createdBatch, phoneScanReady }) {
           onChange={(e) => setDrug({ ...drug, quantity: Number(e.target.value) || 1 })}
           placeholder="Số lượng hộp"
         />
-        <p className="muted qr-hint">
-          Mỗi hộp một QR riêng (ví dụ {drug.drugId || "MA001"}-0001 … -{String(drug.quantity || 1).padStart(4, "0")}).
-          Tối đa {MAX_BOX_QUANTITY} hộp/lần.
-        </p>
         <div className="material-picker">
           <label>Nguyên liệu sử dụng</label>
           {materialsLoadError ? (
@@ -471,7 +469,7 @@ function DistributionPage({ submitTransfer }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="card form-card">
+    <form onSubmit={onSubmit} className="card form-card page-panel">
       <h2><span className="section-icon">🚚</span>Phân phối</h2>
       <input value={transfer.serial} onChange={(e) => setTransfer({ ...transfer, serial: e.target.value })} placeholder="Mã từng hộp (vd: TNDD001-0001)" />
       <input value={transfer.from} onChange={(e) => setTransfer({ ...transfer, from: e.target.value })} placeholder="Nhập bên gửi" />
@@ -482,7 +480,6 @@ function DistributionPage({ submitTransfer }) {
         <option value="Hospital">Bệnh viện</option>
         <option value="Pharmacy">Nhà thuốc</option>
       </select>
-      <p className="muted qr-hint">Đánh dấu <b>Đã bán</b> từng hộp tại trang <Link to="/nguoi-ban">Người bán</Link> (MetaMask).</p>
       <button className="btn-primary" type="submit">Chuyển giao thuốc</button>
     </form>
   );
@@ -530,10 +527,9 @@ function QrLibraryPage() {
   const groups = groupDrugsByProduct(filtered);
 
   return (
-    <div className="qr-library-page">
-      <div className="card">
+    <div className="qr-library-page page-full">
+      <div className="card page-toolbar">
         <h2><span className="section-icon">📱</span>Kho QR thuốc</h2>
-        <p className="muted">Bấm từng dòng loại thuốc để xem QR từng hộp (mỗi hộp một mã).</p>
         <input
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
@@ -597,6 +593,7 @@ function QrLibraryPage() {
 function SellerPage({ wallet, connectWallet, submitSale, loading }) {
   const [serial, setSerial] = useState("");
   const [sellerLabel, setSellerLabel] = useState("");
+  const [showGuide, setShowGuide] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -604,13 +601,34 @@ function SellerPage({ wallet, connectWallet, submitSale, loading }) {
   }
 
   return (
-    <div className="grid">
-      <form onSubmit={onSubmit} className="card form-card seller-card">
-        <h2><span className="section-icon">🛒</span>Người bán — Xác nhận đã bán</h2>
-        <p className="muted">
-          Dành cho nhà thuốc / bệnh viện / điểm bán. Mỗi hộp có QR riêng — quét hoặc nhập mã hộp (vd:{" "}
-          <b>TNDD001-0003</b>), ký bằng MetaMask để ghi <b>Đã bán</b> lên blockchain.
-        </p>
+    <div className="seller-page-wrap">
+      <form onSubmit={onSubmit} className="card form-card page-panel seller-card">
+        <div className="page-title-row">
+          <h2><span className="section-icon">🛒</span>Người bán — Xác nhận đã bán</h2>
+          <button
+            type="button"
+            className="guide-icon-btn"
+            onClick={() => setShowGuide((v) => !v)}
+            title="Hướng dẫn"
+            aria-label="Hướng dẫn"
+            aria-expanded={showGuide}
+          >
+            ?
+          </button>
+        </div>
+        {showGuide && (
+          <div className="guide-panel">
+            <ol className="seller-steps">
+              <li>Phân phối chuyển hộp tới ví nhà thuốc (địa chỉ 0x...).</li>
+              <li>Khách mua 1 hộp → quét QR trên hộp đó.</li>
+              <li>Nhập đúng mã hộp → Xác nhận → Confirm MetaMask.</li>
+              <li>
+                Quét lại QR → hiển thị <b>Đã bán</b> (chỉ hộp đó).
+              </li>
+            </ol>
+            <Link to="/kho-qr">Xem Kho QR</Link>
+          </div>
+        )}
         {!wallet.connected ? (
           <div className="seller-connect">
             <p className="bad">Cần kết nối MetaMask (mạng Sepolia) và là chủ hộp trên chain.</p>
@@ -630,25 +648,12 @@ function SellerPage({ wallet, connectWallet, submitSale, loading }) {
               onChange={(e) => setSellerLabel(e.target.value)}
               placeholder="Tên điểm bán (vd: Nhà thuốc ABC)"
             />
-            <p className="muted qr-hint">
-              Giao dịch on-chain: chuyển trạng thái <b>Sold</b> — phí gas Sepolia ETH. Chỉ hộp chưa bán mới xác nhận được.
-            </p>
             <button className="btn-primary" type="submit" disabled={loading || !serial.trim()}>
               Xác nhận đã bán (MetaMask)
             </button>
           </>
         )}
       </form>
-      <div className="card">
-        <h3>Hướng dẫn</h3>
-        <ol className="seller-steps">
-          <li>Phân phối chuyển hộp tới ví nhà thuốc (địa chỉ 0x...).</li>
-          <li>Khách mua 1 hộp → quét QR trên hộp đó.</li>
-          <li>Nhập đúng mã hộp → Xác nhận → Confirm MetaMask.</li>
-          <li>Quét lại QR → hiển thị <b>Đã bán</b> (chỉ hộp đó).</li>
-        </ol>
-        <Link to="/kho-qr">Xem Kho QR</Link>
-      </div>
     </div>
   );
 }
