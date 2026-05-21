@@ -1092,16 +1092,17 @@ function VerifyPage() {
       const result = await verifyDrug(serial);
       setData(result);
     } catch (e) {
+      const status = e.response?.status;
       const raw = e.response?.data?.message || e.response?.data?.error || e.message;
       const message = String(raw || "");
-      if (message.includes("Network Error")) {
-        setError(
-          `Không kết nối được backend (${getApiBase()}). Kiểm tra backend Render đang chạy và mở đúng ${window.location.origin}`
-        );
+      if (status === 404) {
+        setError(`Không có mã ${serial} trong hệ thống. Tạo thuốc mới hoặc quét mã hộp / mã lô trên QR in từ Kho QR.`);
+      } else if (message.includes("Network Error")) {
+        setError(`Không kết nối backend (${getApiBase()}). Kiểm tra Render đang chạy.`);
       } else if (message.includes("Drug not found") || message.includes("CALL_EXCEPTION")) {
-        setError("Không tra cứu được trên blockchain. Thử quét mã hộp TNDD001-0001 hoặc mã lô dạng TNDD001@ten-lo-sx.");
-      } else if (message.length > 180) {
-        setError("Lỗi hệ thống khi tra cứu. Deploy lại backend bản mới hoặc thử mã hộp cụ thể.");
+        setError("Backend chưa cập nhật. Deploy lại Render, hoặc quét mã hộp TNDD001-0001 / mã lô trên Kho QR.");
+      } else if (message.length > 120) {
+        setError("Lỗi tra cứu. Thử mã hộp cụ thể hoặc deploy lại backend.");
       } else {
         setError(message);
       }
@@ -1144,9 +1145,32 @@ function VerifyPage() {
       {error && <p className="bad">{error}</p>}
       {data && (
         <div className="verify-layout">
-          <div className={`card verify-status ${data.authentic ? "is-authentic" : "is-fake"}`}>
+          <div className={`card verify-status ${data.authentic ? "is-authentic" : data.chainHash ? "is-fake" : "is-pending"}`}>
             <h2>{data.result}</h2>
-            <p>{data.authentic ? "Dữ liệu khớp với blockchain." : "Hash dữ liệu không khớp blockchain."}</p>
+            <p>
+              {data.authentic
+                ? "Dữ liệu khớp với blockchain."
+                : data.chainHash
+                  ? "Hash dữ liệu không khớp blockchain."
+                  : "Đã tìm thấy trong hệ thống. Mã quét là mã thuốc chung — dùng QR từng hộp để xác thực đầy đủ."}
+            </p>
+            {data.hint && <p className="muted">{data.hint}</p>}
+            {data.relatedBoxes?.length > 1 && (
+              <p className="muted">
+                {data.boxCount} hộp · ví dụ:{" "}
+                {data.relatedBoxes.slice(0, 3).map((s, i) => (
+                  <span key={s}>
+                    {i > 0 ? ", " : ""}
+                    <Link to={`/verify/${encodeURIComponent(s)}`}>{s}</Link>
+                  </span>
+                ))}
+              </p>
+            )}
+            {data.lotSerial && (
+              <p className="muted">
+                Mã lô: <Link to={`/verify/${encodeURIComponent(data.lotSerial)}`}>{data.lotSerial}</Link>
+              </p>
+            )}
             <p className="muted">Thời gian kiểm tra: {formatDateTime(data.verifiedAt)}</p>
           </div>
 

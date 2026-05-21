@@ -780,6 +780,13 @@ a:hover { color: var(--lc-blue-light); }
   border-color: #ffc9d2;
   background: linear-gradient(180deg, #fff5f7, #ffffff);
 }
+.verify-status.is-pending {
+  border-color: #ffe0a3;
+  background: linear-gradient(180deg, #fffbf0, #ffffff);
+}
+.verify-status.is-pending h2 {
+  color: #b45309;
+}
 .verify-status h2 {
   margin: 0 0 6px;
 }

@@ -575,21 +575,26 @@ app.get("/api/verify/:serial", async (req, res) => {
 
     if (!drug) return res.status(404).json({ authentic: false, message: "Không tìm thấy mã thuốc này." });
 
+    const materials = drug.materialsUsed || [];
     const lotSerial = drug.lotSerial || buildLotSerial(drug.drugId, drug.batch);
-    const lotHash = sha256FromParts(lotHashParts(drug.drugId, drug.materialsUsed, drug.batch));
-    const newHash = sha256FromParts([drug.drugId, drug.materialsUsed.join(","), drug.batch, drug.serial]);
-    const legacyHash = sha256FromParts([drug.drugId, drug.materialsUsed.join(","), drug.batch]);
+    const lotHash = sha256FromParts(lotHashParts(drug.drugId, materials, drug.batch));
+    const newHash = sha256FromParts([drug.drugId, materials.join(","), drug.batch, drug.serial]);
+    const legacyHash = sha256FromParts([drug.drugId, materials.join(","), drug.batch]);
     const chainCandidates = [lotSerial, drug.serial, serial].filter(
       (value, index, arr) => value && arr.indexOf(value) === index
     );
     let chainHash = null;
-    for (const candidate of chainCandidates) {
-      // eslint-disable-next-line no-await-in-loop
-      const hash = await chain.getDrugHash(candidate);
-      if (hash) {
-        chainHash = hash;
-        break;
+    try {
+      for (const candidate of chainCandidates) {
+        // eslint-disable-next-line no-await-in-loop
+        const hash = await chain.getDrugHash(candidate);
+        if (hash) {
+          chainHash = hash;
+          break;
+        }
       }
+    } catch (_chainErr) {
+      chainHash = null;
     }
     const authentic =
       Boolean(chainHash) &&
@@ -597,6 +602,12 @@ app.get("/api/verify/:serial", async (req, res) => {
         chainHash === newHash ||
         chainHash === legacyHash ||
         chainHash === drug.drugHash);
+
+    const allForGroup = await storage.listDrugs();
+    const relatedBoxes = allForGroup
+      .filter((item) => String(item.drugId || "").trim() === String(drug.drugId || "").trim())
+      .map((item) => item.serial)
+      .sort();
 
     const materialsDetail = [];
     for (const materialId of drug.materialsUsed || []) {
@@ -625,27 +636,42 @@ app.get("/api/verify/:serial", async (req, res) => {
       );
     }
 
-    await storage.logScan({
-      serial,
-      at: new Date().toISOString(),
-      authentic,
-      chainHash,
-      newHash,
-    });
+    try {
+      await storage.logScan({
+        serial,
+        at: new Date().toISOString(),
+        authentic,
+        chainHash,
+        newHash,
+      });
+    } catch (_logErr) {
+      /* ignore scan log errors */
+    }
+
+    const isProductCode = serial === String(drug.drugId || "").trim();
+    let hint = "";
+    if (!authentic && isProductCode && relatedBoxes.length > 0) {
+      hint = `Quét mã hộp ${relatedBoxes[0]} hoặc mã lô ${lotSerial} để xác thực blockchain.`;
+    } else if (!authentic && !chainHash) {
+      hint = "Có trong hệ thống. Blockchain chưa có mã này — thử mã hộp hoặc mã lô.";
+    }
 
     res.json({
       authentic,
-      result: authentic ? "Thuốc chính hãng" : chainHash ? "Nghi ngờ thuốc giả" : "Có trong hệ thống — chưa khớp blockchain",
+      result: authentic ? "Thuốc chính hãng" : chainHash ? "Nghi ngờ thuốc giả" : "Có trong hệ thống",
       chainHash,
       newHash,
       lotSerial,
       scannedCode: serial,
+      hint,
+      boxCount: relatedBoxes.length,
+      relatedBoxes: relatedBoxes.slice(0, 20),
       drug,
       materialsDetail,
       verifiedAt: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, message: "Lỗi tra cứu. Thử lại hoặc quét mã hộp cụ thể." });
   }
 });
 
