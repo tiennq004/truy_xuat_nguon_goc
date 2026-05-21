@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { ethers } from "ethers";
@@ -13,11 +13,13 @@ import {
   listMaterials,
   listDrugs,
   transferDrug,
+  transferDrugBulk,
   transferDrugOffchain,
   sellDrugBoxOffchain,
   verifyDrug,
 } from "./api";
 import { buildVerifyUrl, canPhoneScanQr, getApiBase, getVerifyBase } from "./utils/url";
+import { buildLotSerial, groupDrugsByLot, lotHashInput } from "./utils/lot";
 import { groupDrugsByProduct, normalizeQuantity } from "./utils/serials";
 import {
   SUPPLY_CHAIN_STEPS,
@@ -58,7 +60,6 @@ function Footer() {
           <Link to="/san-xuat">Sản xuất</Link>
           <Link to="/kho-qr">Kho QR</Link>
           <Link to="/nguoi-ban">Người bán</Link>
-          <Link to="/xac-minh">Xác minh</Link>
         </div>
       </div>
       <p className="lc-footer-copy">© Hệ thống truy xuất nguồn gốc dược phẩm</p>
@@ -124,7 +125,6 @@ function Header({ connectWallet, loadHealth, wallet, health, message, loading, d
         <NavLink to="/phan-phoi">Phân phối</NavLink>
         <NavLink to="/kho-qr">Kho QR</NavLink>
         <NavLink to="/nguoi-ban">Người bán</NavLink>
-        <NavLink to="/xac-minh">Xác minh QR</NavLink>
       </nav>
       <div className="lc-header-meta">
         {message && <div className="lc-alert">{message}</div>}
@@ -192,13 +192,6 @@ function HomePage() {
               <p>Đăng ký lô sản xuất mới</p>
             </div>
           </Link>
-          <Link to="/xac-minh" className="lc-quick-card">
-            <span className="lc-quick-icon">🔎</span>
-            <div>
-              <b>Xác minh QR</b>
-              <p>Tra cứu nguồn gốc thuốc</p>
-            </div>
-          </Link>
           <Link to="/phan-phoi" className="lc-quick-card">
             <span className="lc-quick-icon">🚚</span>
             <div>
@@ -248,11 +241,6 @@ function HomePage() {
           <p>Quét mã QR trên bao bì để xem lịch sử phân phối, nguyên liệu và xác thực blockchain.</p>
         </div>
         <div className="lc-health-cards">
-          <Link to="/verify/MAU_THUOC" className="lc-health-item">
-            <span>🔎</span>
-            <b>Tra cứu mẫu</b>
-            <small>Mở trang xác minh</small>
-          </Link>
           <Link to="/nguyen-lieu" className="lc-health-item">
             <span>🧪</span>
             <b>Nguyên liệu</b>
@@ -275,7 +263,7 @@ function HomePage() {
           <span>➜</span>
           <div className="diagram-step">🚚 Phân phối</div>
           <span>➜</span>
-          <div className="diagram-step">🔎 Xác minh QR</div>
+          <div className="diagram-step">🛒 Bán hàng</div>
         </div>
       </section>
     </div>
@@ -404,6 +392,10 @@ function DrugPage({ submitDrug, phoneScanReady }) {
           }}
           placeholder="Số lượng hộp mới (tối thiểu 1, không giới hạn)"
         />
+        <p className="muted">
+          Blockchain: 1 mã lô tổng <code>{buildLotSerial(drug.drugId || "MA_THUOC", drug.batch || "LO_SX")}</code> (1 lần Confirm).
+          Mỗi hộp vẫn có QR riêng off-chain.
+        </p>
         <div className="material-picker">
           <label>Nguyên liệu sử dụng</label>
           {materialsLoadError ? (
@@ -458,27 +450,120 @@ function DrugPage({ submitDrug, phoneScanReady }) {
   );
 }
 
-function DistributionPage({ submitTransfer }) {
-  const [transfer, setTransfer] = useState({ serial: "", from: "", to: "", status: "Distributor" });
+function DistributionPage({ submitTransferBulk, loading }) {
+  const [groups, setGroups] = useState([]);
+  const [loadError, setLoadError] = useState("");
+  const [transfer, setTransfer] = useState({
+    lotSerial: "",
+    from: "",
+    to: "",
+    status: "Distributor",
+    fromStatus: "",
+  });
+
+  useEffect(() => {
+    let active = true;
+    listDrugs()
+      .then((res) => {
+        if (!active) return;
+        setGroups(groupDrugsByLot(res.items || []));
+        setLoadError("");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setGroups([]);
+        setLoadError(err.response?.data?.error || err.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedGroup = groups.find((g) => g.lotSerial === transfer.lotSerial);
+  const pendingBoxes = (selectedGroup?.boxes || []).filter((b) => {
+    if (b.status === "Sold") return false;
+    if (transfer.fromStatus && normalizeStatus(b.status) !== transfer.fromStatus) return false;
+    return true;
+  });
 
   async function onSubmit(e) {
     e.preventDefault();
-    await submitTransfer(transfer);
+    if (!transfer.lotSerial) return;
+    await submitTransferBulk({
+      lotSerial: transfer.lotSerial,
+      batch: selectedGroup?.batch,
+      drugId: selectedGroup?.drugId,
+      from: transfer.from,
+      to: transfer.to,
+      status: transfer.status,
+      fromStatus: transfer.fromStatus || undefined,
+      serials: pendingBoxes.map((b) => b.serial),
+    });
   }
 
   return (
     <form onSubmit={onSubmit} className="card form-card page-panel">
-      <h2><span className="section-icon">🚚</span>Phân phối</h2>
-      <input value={transfer.serial} onChange={(e) => setTransfer({ ...transfer, serial: e.target.value })} placeholder="Mã từng hộp (vd: TNDD001-0001)" />
-      <input value={transfer.from} onChange={(e) => setTransfer({ ...transfer, from: e.target.value })} placeholder="Nhập bên gửi" />
-      <input value={transfer.to} onChange={(e) => setTransfer({ ...transfer, to: e.target.value })} placeholder="Nhập bên nhận / địa chỉ ví" />
-      <select value={transfer.status} onChange={(e) => setTransfer({ ...transfer, status: e.target.value })}>
-        <option value="Manufacturer">Nhà sản xuất</option>
-        <option value="Distributor">Nhà phân phối</option>
-        <option value="Hospital">Bệnh viện</option>
-        <option value="Pharmacy">Nhà thuốc</option>
+      <h2><span className="section-icon">🚚</span>Phân phối theo lô</h2>
+      <p className="muted">Chọn lô sản xuất — 1 lần Confirm MetaMask cho cả lô (mã lô tổng trên blockchain).</p>
+      {loadError && <p className="bad">{loadError}</p>}
+      <select
+        value={transfer.lotSerial}
+        onChange={(e) => setTransfer({ ...transfer, lotSerial: e.target.value })}
+        required
+      >
+        <option value="">▼ Chọn lô sản xuất</option>
+        {groups.map((g) => (
+          <option key={g.lotSerial} value={g.lotSerial}>
+            {g.drugName || g.drugId} · Lô {g.batch || "—"} — {g.boxes.length} hộp ({g.soldCount || 0} đã bán)
+          </option>
+        ))}
       </select>
-      <button className="btn-primary" type="submit">Chuyển giao thuốc</button>
+      {selectedGroup && (
+        <p className="muted">
+          Mã lô blockchain: <b className="mono">{selectedGroup.lotSerial}</b>
+        </p>
+      )}
+      <select
+        value={transfer.fromStatus}
+        onChange={(e) => setTransfer({ ...transfer, fromStatus: e.target.value })}
+      >
+        <option value="">Tất cả hộp chưa bán</option>
+        <option value="Manufacturer">Chỉ hộp đang: Nhà sản xuất</option>
+        <option value="Distributor">Chỉ hộp đang: Nhà phân phối</option>
+        <option value="Hospital">Chỉ hộp đang: Bệnh viện</option>
+        <option value="Pharmacy">Chỉ hộp đang: Nhà thuốc</option>
+      </select>
+      {transfer.lotSerial && (
+        <p className="status-pill">
+          Sẽ chuyển giao: <b>{pendingBoxes.length}</b> hộp
+          {pendingBoxes.length > 0 && (
+            <span className="muted">
+              {" "}
+              ({pendingBoxes[0].serial}
+              {pendingBoxes.length > 1 ? ` … ${pendingBoxes[pendingBoxes.length - 1].serial}` : ""})
+            </span>
+          )}
+        </p>
+      )}
+      <input value={transfer.from} onChange={(e) => setTransfer({ ...transfer, from: e.target.value })} placeholder="Bên gửi (ghi chú, tùy chọn)" />
+      <input
+        value={transfer.to}
+        onChange={(e) => setTransfer({ ...transfer, to: e.target.value })}
+        placeholder="Bên nhận — địa chỉ ví 0x... (42 ký tự)"
+        required
+      />
+      <select value={transfer.status} onChange={(e) => setTransfer({ ...transfer, status: e.target.value })}>
+        <option value="Distributor">→ Nhà phân phối</option>
+        <option value="Hospital">→ Bệnh viện</option>
+        <option value="Pharmacy">→ Nhà thuốc</option>
+      </select>
+      <button
+        className="btn-primary"
+        type="submit"
+        disabled={loading || !transfer.lotSerial || pendingBoxes.length === 0 || !transfer.to.trim()}
+      >
+        Chuyển giao cả lô ({pendingBoxes.length || 0} hộp)
+      </button>
     </form>
   );
 }
@@ -522,7 +607,7 @@ function QrLibraryPage() {
     );
   });
 
-  const groups = groupDrugsByProduct(filtered);
+  const groups = groupDrugsByLot(filtered);
 
   return (
     <div className="qr-library-page page-full">
@@ -547,18 +632,19 @@ function QrLibraryPage() {
 
       <div className="qr-group-list">
         {groups.map((group) => {
-          const open = expandedId === group.drugId;
+          const open = expandedId === group.lotSerial;
+          const lotSerial = group.lotSerial || buildLotSerial(group.drugId, group.batch);
           return (
-            <div className="card qr-group-card" key={group.drugId}>
+            <div className="card qr-group-card" key={group.lotSerial}>
               <button
                 type="button"
                 className="qr-group-header"
-                onClick={() => setExpandedId(open ? null : group.drugId)}
+                onClick={() => setExpandedId(open ? null : group.lotSerial)}
               >
                 <div>
                   <h3>{group.drugName || group.drugId}</h3>
                   <p className="muted">
-                    Mã lô: <b>{group.drugId}</b> · Lô {group.batch || "—"} · {group.boxes.length} hộp ·{" "}
+                    Mã lô blockchain: <b>{lotSerial}</b> · SX {group.batch || "—"} · {group.boxes.length} hộp ·{" "}
                     {group.soldCount || 0} đã bán
                   </p>
                 </div>
@@ -566,6 +652,14 @@ function QrLibraryPage() {
               </button>
               {open && (
                 <div className="qr-group-boxes">
+                  <article className="qr-box-item qr-lot-master">
+                    <div className="qr-box-meta">
+                      <span className="product-badge pending">Mã lô tổng</span>
+                      <b className="mono">{lotSerial}</b>
+                    </div>
+                    <QRCodeSVG value={buildVerifyUrl(lotSerial)} size={140} />
+                    <Link to={`/verify/${encodeURIComponent(lotSerial)}`}>Tra cứu lô</Link>
+                  </article>
                   {group.boxes.map((box) => (
                     <article className="qr-box-item" key={box.serial}>
                       <div className="qr-box-meta">
@@ -619,7 +713,7 @@ function SellerPage({ wallet, connectWallet, submitSale, loading }) {
             <ol className="seller-steps">
               <li>Phân phối chuyển hộp tới ví nhà thuốc (địa chỉ 0x...).</li>
               <li>Khách mua 1 hộp → quét QR trên hộp đó.</li>
-              <li>Nhập đúng mã hộp → Xác nhận → Confirm MetaMask.</li>
+              <li>Nhập đúng mã hộp → Xác nhận đã bán (không cần MetaMask).</li>
               <li>
                 Quét lại QR → hiển thị <b>Đã bán</b> (chỉ hộp đó).
               </li>
@@ -627,45 +721,21 @@ function SellerPage({ wallet, connectWallet, submitSale, loading }) {
             <Link to="/kho-qr">Xem Kho QR</Link>
           </div>
         )}
-        {!wallet.connected ? (
-          <div className="seller-connect">
-            <p className="bad">Cần kết nối MetaMask (mạng Sepolia) và là chủ hộp trên chain.</p>
-            <button type="button" className="btn-primary" onClick={connectWallet} disabled={loading}>
-              Kết nối MetaMask
-            </button>
-          </div>
-        ) : (
-          <>
-            <input
-              value={serial}
-              onChange={(e) => setSerial(e.target.value)}
-              placeholder="Mã QR hộp (vd: TNDD001-0001)"
-            />
-            <input
-              value={sellerLabel}
-              onChange={(e) => setSellerLabel(e.target.value)}
-              placeholder="Tên điểm bán (vd: Nhà thuốc ABC)"
-            />
-            <button className="btn-primary" type="submit" disabled={loading || !serial.trim()}>
-              Xác nhận đã bán (MetaMask)
-            </button>
-          </>
-        )}
+        <input
+          value={serial}
+          onChange={(e) => setSerial(e.target.value)}
+          placeholder="Mã QR hộp (vd: TNDD001-0001)"
+        />
+        <input
+          value={sellerLabel}
+          onChange={(e) => setSellerLabel(e.target.value)}
+          placeholder="Tên điểm bán (vd: Nhà thuốc ABC)"
+        />
+        <p className="muted">Bán từng hộp (off-chain). Xác thực nguồn gốc qua mã lô tổng trên blockchain.</p>
+        <button className="btn-primary" type="submit" disabled={loading || !serial.trim()}>
+          Xác nhận đã bán
+        </button>
       </form>
-    </div>
-  );
-}
-
-function VerifyHubPage({ createdBatch }) {
-  const sampleSerial = createdBatch?.items?.[0]?.serial || "MAU-0001";
-  const verifyLink = useMemo(() => buildVerifyUrl(sampleSerial), [sampleSerial]);
-  return (
-    <div className="card qr-card">
-      <h2><span className="section-icon">🔐</span>Xác minh QR</h2>
-      <p>Quét mã QR từng hộp hoặc mở trang xác minh chi tiết.</p>
-      <QRCodeSVG value={verifyLink} size={150} />
-      <p className="mono">{verifyLink}</p>
-      <Link to={`/verify/${sampleSerial}`}>Mở trang xác minh mẫu</Link>
     </div>
   );
 }
@@ -785,36 +855,45 @@ function Dashboard() {
 
       if (wallet.connected) {
         const { contract, address } = await getSignerAndContract();
+        const lotSerial = buildLotSerial(drug.drugId, drug.batch);
+        const lotHash = await sha256Hex(lotHashInput(drug.drugId, materialsUsed, drug.batch));
+        setMessage(`MetaMask: đăng ký lô ${lotSerial} (1 lần Confirm)...`);
+        let txHash = "";
+        try {
+          const tx = await contract.registerDrug(lotSerial, lotHash, address);
+          await tx.wait();
+          txHash = tx.hash;
+        } catch (err) {
+          if (!String(err?.message || "").includes("Drug already exists")) throw err;
+        }
         for (let i = 0; i < serials.length; i += 1) {
           const serial = serials[i];
-          setMessage(`Đang tạo hộp ${i + 1}/${serials.length} trên blockchain...`);
-          const drugHash = await sha256Hex(`${drug.drugId}|${materialsUsed.join(",")}|${drug.batch}|${serial}`);
-          const tx = await contract.registerDrug(serial, drugHash, address);
-          await tx.wait();
+          setMessage(`Đang lưu QR hộp ${i + 1}/${serials.length}...`);
           const offchain = await createDrugOffchain({
             serial,
             drugId: drug.drugId,
             drugName: drug.drugName,
             batch: drug.batch,
+            lotSerial,
             materialsUsed,
             expiry: drug.expiry,
             manufacturer: drug.manufacturer,
             owner: address,
             status: "Manufacturer",
-            drugHash,
-            txHash: tx.hash,
+            drugHash: lotHash,
+            txHash,
             verifyBase: getVerifyBase(),
           });
           items.push(offchain);
         }
-        const batch = { drugId: drug.drugId, count: items.length, items };
+        const batch = { drugId: drug.drugId, lotSerial, count: items.length, items };
         setCreatedBatch(batch);
         const cont =
           availability.isContinuation && availability.existingBoxCount > 0
             ? ` (tiếp tục sau ${availability.existingBoxCount} hộp cũ)`
             : "";
         setMessage(
-          `Đã tạo ${items.length} QR (${items[0]?.serial} … ${items[items.length - 1]?.serial})${cont}. Vào trang Kho QR để xem và in từng hộp.`
+          `Đã đăng ký lô ${lotSerial} (1 Confirm) và ${items.length} QR hộp (${items[0]?.serial} … ${items[items.length - 1]?.serial})${cont}.`
         );
       } else {
         const data = await createDrug({ ...drug, materialsUsed, quantity, verifyBase: getVerifyBase() });
@@ -823,7 +902,9 @@ function Dashboard() {
           data.isContinuation && data.existingBoxCount > 0
             ? ` Tiếp tục từ hộp ${String(data.startIndex).padStart(4, "0")} (đã có ${data.existingBoxCount} hộp).`
             : "";
-        setMessage(`Đã tạo ${data.count} mã QR (${data.items?.[0]?.serial} … ${data.items?.[data.items.length - 1]?.serial})${cont} Vào trang Kho QR.`);
+        setMessage(
+          `Đã tạo lô ${data.lotSerial || buildLotSerial(drug.drugId, drug.batch)} và ${data.count} QR hộp${cont}. Vào Kho QR.`
+        );
       }
     } catch (error) {
       const text = String(error?.message || "");
@@ -842,26 +923,20 @@ function Dashboard() {
   async function submitSale({ serial, sellerLabel }) {
     try {
       setLoading(true);
-      if (!wallet.connected) {
-        setMessage("Vui lòng kết nối MetaMask (Sepolia) để xác nhận bán.");
-        return;
-      }
       if (!serial) {
         setMessage("Nhập mã QR của hộp đã bán (vd: TNDD001-0001).");
         return;
       }
 
-      const { contract, address } = await getSignerAndContract();
-      const tx = await contract.transferDrug(serial, address, "Sold");
-      await tx.wait();
+      const address = wallet.connected ? (await getSignerAndContract()).address : "";
       const data = await sellDrugBoxOffchain({
         serial,
         sellerAddress: address,
         sellerLabel: sellerLabel || "Điểm bán",
         buyerAddress: address,
-        txHash: tx.hash,
+        txHash: "",
       });
-      setMessage(`Đã xác nhận bán hộp ${serial}. Trạng thái: ${getStatusLabel(data.status)}. Tx: ${tx.hash}`);
+      setMessage(`Đã xác nhận bán hộp ${serial}. Trạng thái: ${getStatusLabel(data.status)}. (Ghi nhận off-chain; xác thực lô qua blockchain.)`);
     } catch (error) {
       const text = String(error?.message || "");
       if (text.includes("Only current owner")) {
@@ -880,21 +955,47 @@ function Dashboard() {
     }
   }
 
-  async function submitTransfer(transfer) {
+  async function submitTransferBulk(transfer) {
+    const { lotSerial, drugId, from, to, status, fromStatus, serials } = transfer;
+    const list = Array.isArray(serials) ? serials.filter(Boolean) : [];
+    const lotKey = lotSerial || buildLotSerial(drugId, transfer.batch);
+    if (!lotKey || list.length === 0) {
+      setMessage("Không có hộp nào để chuyển giao. Kiểm tra lô hoặc bộ lọc trạng thái.");
+      return;
+    }
     try {
       setLoading(true);
+      let ok = 0;
+      const failed = [];
       if (wallet.connected) {
         const { contract } = await getSignerAndContract();
-        const tx = await contract.transferDrug(transfer.serial, transfer.to, transfer.status);
-        await tx.wait();
-        const data = await transferDrugOffchain(transfer.serial, { ...transfer, txHash: tx.hash });
-        setMessage(`Cập nhật trạng thái thành công: ${getStatusLabel(data.status)} (${data.currentOwner})`);
+        setMessage(`MetaMask: chuyển giao lô ${lotKey} (1 lần Confirm)...`);
+        try {
+          const tx = await contract.transferDrug(lotKey, to, status);
+          await tx.wait();
+          for (let i = 0; i < list.length; i += 1) {
+            const serial = list[i];
+            setMessage(`Đang cập nhật hộp ${i + 1}/${list.length}...`);
+            await transferDrugOffchain(serial, { from, to, status, txHash: tx.hash });
+            ok += 1;
+          }
+        } catch (err) {
+          failed.push({ serial: lotKey, error: err.message });
+        }
       } else {
-        const data = await transferDrug(transfer.serial, transfer);
-        setMessage(`Cập nhật trạng thái thành công: ${getStatusLabel(data.status)} (${data.currentOwner})`);
+        const data = await transferDrugBulk({ drugId, from, to, status, fromStatus, serials: list });
+        ok = data.updated || 0;
+        if (data.errors?.length) failed.push(...data.errors);
+      }
+      if (failed.length > 0) {
+        setMessage(
+          `Chuyển giao lô ${lotKey}: ${ok}/${list.length} hộp. Lỗi: ${failed[0].serial} — ${failed[0].error}.`
+        );
+      } else {
+        setMessage(`Đã chuyển giao lô ${lotKey}: ${ok} hộp → ${getStatusLabel(status)} (1 giao dịch blockchain).`);
       }
     } catch (error) {
-      setMessage(`Chuyển giao thất bại: ${error.message}`);
+      setMessage(`Chuyển giao lô thất bại: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -930,7 +1031,10 @@ function Dashboard() {
           <Route path="/" element={<HomePage />} />
           <Route path="/nguyen-lieu" element={<MaterialPage submitMaterial={submitMaterial} />} />
           <Route path="/san-xuat" element={<DrugPage submitDrug={submitDrug} phoneScanReady={phoneScanReady} />} />
-          <Route path="/phan-phoi" element={<DistributionPage submitTransfer={submitTransfer} />} />
+          <Route
+            path="/phan-phoi"
+            element={<DistributionPage submitTransferBulk={submitTransferBulk} loading={loading} />}
+          />
           <Route path="/kho-qr" element={<QrLibraryPage />} />
           <Route
             path="/nguoi-ban"
@@ -943,7 +1047,6 @@ function Dashboard() {
               />
             }
           />
-          <Route path="/xac-minh" element={<VerifyHubPage createdBatch={createdBatch} />} />
         </Routes>
       </main>
       <Footer />

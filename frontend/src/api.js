@@ -76,6 +76,10 @@ export function transferDrug(serial, payload) {
   return api.post(`/drugs/${serial}/transfer`, payload).then((r) => r.data);
 }
 
+export function transferDrugBulk(payload) {
+  return api.post("/drugs/transfer-bulk", payload).then((r) => r.data);
+}
+
 export function transferDrugOffchain(serial, payload) {
   return api.post(`/drugs/${serial}/transfer/offchain`, payload).then((r) => r.data);
 }
