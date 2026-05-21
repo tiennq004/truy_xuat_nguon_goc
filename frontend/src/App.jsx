@@ -451,7 +451,7 @@ function DrugPage({ submitDrug, phoneScanReady }) {
           <p className="bad">Đang dùng localhost: chưa quét được trên điện thoại. Chờ hệ thống lấy IP Wi-Fi hoặc mở app bằng IP LAN.</p>
         )}
         <button className="btn-primary" type="submit" disabled={!phoneScanReady}>
-          Tạo {drug.quantity || 1} mã QR (từng hộp)
+          Tạo {drug.quantity || 1} mã QR
         </button>
       </form>
     </div>
