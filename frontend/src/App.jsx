@@ -902,6 +902,7 @@ function Dashboard() {
             owner: address,
             status: "Manufacturer",
             drugHash: lotHash,
+            drugImageUrl: drug.drugImageUrl,
             txHash,
             verifyBase: getVerifyBase(),
           });
