@@ -18,7 +18,7 @@ import {
   verifyDrug,
 } from "./api";
 import { buildVerifyUrl, canPhoneScanQr, getApiBase, getVerifyBase } from "./utils/url";
-import { buildBoxSerials, groupDrugsByProduct, MAX_BOX_QUANTITY } from "./utils/serials";
+import { groupDrugsByProduct, normalizeQuantity } from "./utils/serials";
 import {
   SUPPLY_CHAIN_STEPS,
   getReachedStepIndex,
@@ -325,7 +325,7 @@ function DrugPage({ submitDrug, phoneScanReady }) {
     expiry: "",
     manufacturer: "",
     drugImageUrl: "",
-    quantity: 10,
+    quantity: 1,
   });
 
   useEffect(() => {
@@ -385,10 +385,24 @@ function DrugPage({ submitDrug, phoneScanReady }) {
         <input
           type="number"
           min={1}
-          max={MAX_BOX_QUANTITY}
+          step={1}
           value={drug.quantity}
-          onChange={(e) => setDrug({ ...drug, quantity: Number(e.target.value) || 1 })}
-          placeholder="Số lượng hộp"
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (raw === "") {
+              setDrug({ ...drug, quantity: 1 });
+              return;
+            }
+            const n = Math.max(1, Math.floor(Number(raw) || 1));
+            setDrug({ ...drug, quantity: n });
+          }}
+          onBlur={() => {
+            setDrug((prev) => ({
+              ...prev,
+              quantity: Math.max(1, normalizeQuantity(prev.quantity)),
+            }));
+          }}
+          placeholder="Số lượng hộp mới (tối thiểu 1, không giới hạn)"
         />
         <div className="material-picker">
           <label>Nguyên liệu sử dụng</label>
@@ -744,14 +758,8 @@ function Dashboard() {
   async function submitDrug(drug) {
     try {
       setLoading(true);
-      const quantity = Math.max(1, Math.min(MAX_BOX_QUANTITY, Number(drug.quantity) || 1));
+      const quantity = normalizeQuantity(drug.quantity);
       const availability = await checkDrugSerials(drug.drugId, quantity);
-      if (!availability.available) {
-        setMessage(
-          `Đã có hộp trùng mã: ${availability.existingSerials.slice(0, 5).join(", ")}${availability.existingSerials.length > 5 ? "..." : ""}. Đổi mã thuốc hoặc giảm số lượng.`
-        );
-        return;
-      }
 
       const materialsUsed = Array.isArray(drug.materialsUsed)
         ? drug.materialsUsed
@@ -768,7 +776,11 @@ function Dashboard() {
         return;
       }
 
-      const serials = buildBoxSerials(drug.drugId, quantity);
+      const serials = availability.plannedSerials || [];
+      if (serials.length === 0) {
+        setMessage("Không xác định được mã hộp mới. Kiểm tra mã thuốc và thử lại.");
+        return;
+      }
       const items = [];
 
       if (wallet.connected) {
@@ -797,18 +809,26 @@ function Dashboard() {
         }
         const batch = { drugId: drug.drugId, count: items.length, items };
         setCreatedBatch(batch);
+        const cont =
+          availability.isContinuation && availability.existingBoxCount > 0
+            ? ` (tiếp tục sau ${availability.existingBoxCount} hộp cũ)`
+            : "";
         setMessage(
-          `Đã tạo ${items.length} QR (${items[0]?.serial} … ${items[items.length - 1]?.serial}). Vào trang Kho QR để xem và in từng hộp.`
+          `Đã tạo ${items.length} QR (${items[0]?.serial} … ${items[items.length - 1]?.serial})${cont}. Vào trang Kho QR để xem và in từng hộp.`
         );
       } else {
         const data = await createDrug({ ...drug, materialsUsed, quantity, verifyBase: getVerifyBase() });
         setCreatedBatch({ drugId: data.drugId, count: data.count, items: data.items });
-        setMessage(`Đã tạo ${data.count} mã QR bằng backend. Vào trang Kho QR để xem từng hộp.`);
+        const cont =
+          data.isContinuation && data.existingBoxCount > 0
+            ? ` Tiếp tục từ hộp ${String(data.startIndex).padStart(4, "0")} (đã có ${data.existingBoxCount} hộp).`
+            : "";
+        setMessage(`Đã tạo ${data.count} mã QR (${data.items?.[0]?.serial} … ${data.items?.[data.items.length - 1]?.serial})${cont} Vào trang Kho QR.`);
       }
     } catch (error) {
       const text = String(error?.message || "");
       if (text.includes("Drug already exists") || text.includes("already exist")) {
-        setMessage("Một số mã hộp đã tồn tại trên blockchain. Vui lòng đổi mã thuốc khác.");
+        setMessage("Một số mã hộp đã tồn tại trên blockchain. Thử lại — hệ thống sẽ tự nhảy sang số hộp trống tiếp theo.");
       } else if (text.includes("user denied") || text.includes("ACTION_REJECTED")) {
         setMessage("Đã hủy trên MetaMask. Bấm tạo lại và Confirm từng lô (hoặc dùng chế độ backend).");
       } else {

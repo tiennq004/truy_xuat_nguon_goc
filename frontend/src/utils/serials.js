@@ -1,13 +1,33 @@
-export const MAX_BOX_QUANTITY = 200;
+export function normalizeQuantity(quantity) {
+  const n = Number(quantity);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.floor(n);
+}
 
-export function buildBoxSerials(drugId, quantity) {
+export function getMaxBoxIndexFromList(items, drugId) {
   const id = String(drugId || "").trim();
-  const qty = Math.max(1, Math.min(MAX_BOX_QUANTITY, Number(quantity) || 1));
-  const serials = [];
-  for (let i = 1; i <= qty; i += 1) {
-    serials.push(`${id}-${String(i).padStart(4, "0")}`);
+  const prefix = `${id}-`;
+  let max = 0;
+  for (const item of items || []) {
+    const serial = typeof item === "string" ? item : item?.serial;
+    if (!serial || !String(serial).startsWith(prefix)) continue;
+    const suffix = String(serial).slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    const n = parseInt(suffix, 10);
+    if (Number.isFinite(n) && n > max) max = n;
   }
-  return serials;
+  return max;
+}
+
+export function buildNextBoxSerials(drugId, quantity, startIndex) {
+  const id = String(drugId || "").trim();
+  const qty = normalizeQuantity(quantity);
+  const start = Math.max(1, Math.floor(Number(startIndex) || 1));
+  const serials = [];
+  for (let i = 0; i < qty; i += 1) {
+    serials.push(`${id}-${String(start + i).padStart(4, "0")}`);
+  }
+  return { serials, startIndex: start, endIndex: start + qty - 1, quantity: qty };
 }
 
 export function groupDrugsByProduct(items) {

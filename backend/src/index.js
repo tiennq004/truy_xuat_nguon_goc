@@ -4,7 +4,7 @@ const dotenv = require("dotenv");
 const os = require("os");
 const QRCode = require("qrcode");
 const { sha256FromParts } = require("./utils/hash");
-const { buildBoxSerials, MAX_BOX_QUANTITY } = require("./utils/serials");
+const { resolveNextBoxSerials } = require("./utils/serials");
 const storage = require("./services/storage");
 const chain = require("./services/chain");
 
@@ -162,22 +162,19 @@ app.post("/api/drugs", async (req, res) => {
       return res.status(400).json({ error: "drugId, batch, materialsUsed are required" });
     }
 
-    const serials = buildBoxSerials(drugId, quantity);
-    const existingSerials = [];
-    for (const serial of serials) {
-      // eslint-disable-next-line no-await-in-loop
-      const existingOffchain = await storage.getDrug(serial);
-      // eslint-disable-next-line no-await-in-loop
-      const existingOnchain = await chain.drugExists(serial);
-      if (existingOffchain || existingOnchain) existingSerials.push(serial);
-    }
-    if (existingSerials.length > 0) {
-      return res.status(409).json({
-        error: `Some box serials already exist (${existingSerials.length}/${serials.length})`,
-        existingSerials: existingSerials.slice(0, 20),
-        source: "mixed",
-      });
-    }
+    const allItems = await storage.listDrugs();
+    const { serials, startIndex, endIndex, existingBoxCount, isContinuation } = await resolveNextBoxSerials(
+      drugId,
+      quantity,
+      {
+        listItems: allItems,
+        exists: async (serial) => {
+          const existingOffchain = await storage.getDrug(serial);
+          const existingOnchain = await chain.drugExists(serial);
+          return Boolean(existingOffchain || existingOnchain);
+        },
+      }
+    );
 
     const persistedDrugImageUrl = await storage.persistImage(drugImageUrl, "drugs", String(drugId).trim());
     const items = [];
@@ -216,7 +213,10 @@ app.post("/api/drugs", async (req, res) => {
       count: items.length,
       drugId: String(drugId).trim(),
       quantity: items.length,
-      maxQuantity: MAX_BOX_QUANTITY,
+      startIndex,
+      endIndex,
+      existingBoxCount,
+      isContinuation,
       items,
     });
   } catch (error) {
@@ -242,21 +242,24 @@ app.get("/api/drugs/check-serials", async (req, res) => {
       return res.status(400).json({ error: "drugId is required" });
     }
 
-    const serials = buildBoxSerials(drugId, quantity);
-    const existingSerials = [];
-    for (const serial of serials) {
-      // eslint-disable-next-line no-await-in-loop
-      const existingOffchain = await storage.getDrug(serial);
-      // eslint-disable-next-line no-await-in-loop
-      const existingOnchain = await chain.drugExists(serial);
-      if (existingOffchain || existingOnchain) existingSerials.push(serial);
-    }
+    const allItems = await storage.listDrugs();
+    const plan = await resolveNextBoxSerials(drugId, quantity, {
+      listItems: allItems,
+      exists: async (serial) => {
+        const existingOffchain = await storage.getDrug(serial);
+        const existingOnchain = await chain.drugExists(serial);
+        return Boolean(existingOffchain || existingOnchain);
+      },
+    });
 
     res.json({
-      available: existingSerials.length === 0,
-      existingSerials,
-      plannedSerials: serials,
-      quantity: serials.length,
+      available: true,
+      plannedSerials: plan.serials,
+      quantity: plan.quantity,
+      startIndex: plan.startIndex,
+      endIndex: plan.endIndex,
+      existingBoxCount: plan.existingBoxCount,
+      isContinuation: plan.isContinuation,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
