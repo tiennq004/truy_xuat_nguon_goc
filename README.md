@@ -122,37 +122,61 @@ Người dùng truy xuất
 
 ## 🧩 3. Hình ảnh các chức năng
 
-### Hình 1: Sơ đồ kiến trúc hệ thống
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/so_do_kien_truc_he_thong.png" alt="Ảnh 1" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 1: Sơ đồ kiến trúc hệ thống  </em>
+</p>
 
-(Chèn ảnh sơ đồ kiến trúc)
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/giao_dien_chinh.png" alt="Ảnh 2" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 2: Giao diện chính của hệ thống  </em>
+</p>
 
-### Hình 2: Giao diện chính
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/giao_dien_dang_ky_nguyen_lieu.png" alt="Ảnh 3" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 3: Giao diện đăng ký nguyên liệu  </em>
+</p>
 
-(Chèn ảnh giao diện chính)
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/giao_dien_dang_ky_san_xuat_thuoc.png" alt="Ảnh 4" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 4: Giao diện đăng ký sản xuất thuốc  </em>
+</p>
 
-### Hình 3: Đăng ký nguyên liệu
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/giao_dien_phan_phoi_thuoc.png" alt="Ảnh 5" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 5: Giao diện phân phối thuốc  </em>
+</p>
 
-(Chèn ảnh đăng ký nguyên liệu)
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/giao_dien_kho_qr.png" alt="Ảnh 6" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 6: Giao diện Kho QR  </em>
+</p>
 
-### Hình 4: Đăng ký thuốc thành phẩm
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/giao_dien_nguoi_ban.png" alt="Ảnh 7" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 7: Giao diện Người bán  </em>
+</p>
 
-(Chèn ảnh đăng ký thuốc)
-
-### Hình 5: Phân phối sản phẩm
-
-(Chèn ảnh phân phối)
-
-### Hình 6: Kho mã QR
-
-(Chèn ảnh kho QR)
-
-### Hình 7: Giao diện người bán
-
-(Chèn ảnh người bán)
-
-### Hình 8: Quét QR xác minh nguồn gốc
-
-(Chèn ảnh truy xuất nguồn gốc)
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/giao_dien_thong_tin_thuoc_khi_quet_ma_qr.png" alt="Ảnh 8" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 7: Giao diện thông tin thuốc khi quét mã QR  </em>
+</p>
 
 ---
 
