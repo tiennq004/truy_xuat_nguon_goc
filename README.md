@@ -159,6 +159,12 @@ Người dùng truy xuất
   <em>Hình 7: Giao diện thông tin thuốc khi quét mã QR  </em>
 </p>
 
+<p align="center">
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/poster.png" alt="Ảnh 1" width="800"/>
+</p> 
+<p align="center">
+  <em>Hình 8: Poster  </em>
+</p>
 ---
 
 ## ⚙️ 4. Các bước cài đặt
