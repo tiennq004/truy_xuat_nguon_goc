@@ -5,7 +5,7 @@
 </h2>
 
 <h2 align="center">  
-   XÂY DỰNG HỆ THỐNG PHÁT HIỆN TÉ NGÃ CỦA CON NGƯỜI TỪ DỮ LIỆU VIDEO DỰ TRÊN KỸ THUẬT THỊ GIÁC MÁY TÍNH VÀ PHÂN TÍCH TƯ THẾ CƠ THỂ
+   HỆ THỐNG TRUY XUẤT NGUỒN GỐC DƯỢC PHẨM VÀ THUỐC ĐẶC TRỊ
 </h2>
 
 <div align="center">
@@ -18,25 +18,6 @@
 [![AIoTLab](https://img.shields.io/badge/AIoTLab-green?style=for-the-badge)](https://www.facebook.com/DNUAIoTLab)
 [![Faculty of Information Technology](https://img.shields.io/badge/Faculty%20of%20Information%20Technology-blue?style=for-the-badge)](https://dainam.edu.vn/vi/khoa-cong-nghe-thong-tin)
 [![DaiNam University](https://img.shields.io/badge/DaiNam%20University-orange?style=for-the-badge)](https://dainam.edu.vn)
-</div>
-
----
-
-
-<h2 align="center">
-    <a href="https://dainam.edu.vn/vi/khoa-cong-nghe-thong-tin">
-    🎓 Faculty of Information Technology (DaiNam University)
-    </a>
-</h2>
-
-<h2 align="center">
-HỆ THỐNG TRUY XUẤT NGUỒN GỐC DƯỢC PHẨM VÀ THUỐC ĐẶC TRỊ ỨNG DỤNG CÔNG NGHỆ BLOCKCHAIN
-</h2>
-
-<div align="center">
-    <p align="center">
-        <img src="img/dnu_logo.png" alt="DNU Logo" width="180"/>
-    </p>
 </div>
 
 ---
