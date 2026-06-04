@@ -221,6 +221,6 @@ npx hardhat run scripts/deploy.js
 
 * Trường: Đại học Đại Nam
 
-**Giảng viên hướng dẫn:** ThS. Trần Đăng Công
+**Giảng viên hướng dẫn:** TS. Trần Đăng Công
 
 © 2026 – Khoa Công Nghệ Thông Tin, Trường Đại học Đại Nam.
