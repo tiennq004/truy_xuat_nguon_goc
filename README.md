@@ -160,12 +160,11 @@ Người dùng truy xuất
 </p>
 
 <p align="center">
-  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/poster.png" alt="Ảnh 1" width="800"/>
+  <img src="https://github.com/tiennq004/truy_xuat_nguon_goc/blob/main/img/poster.png" alt="Ảnh 8" width="800"/>
 </p> 
 <p align="center">
   <em>Hình 8: Poster  </em>
 </p>
----
 
 ## ⚙️ 4. Các bước cài đặt
 
