@@ -1,170 +1,216 @@
-# He thong truy xuat nguon goc duoc pham (Blockchain)
+<h2 align="center">
+    <a href="https://dainam.edu.vn/vi/khoa-cong-nghe-thong-tin">
+    🎓 Faculty of Information Technology (DaiNam University)
+    </a>
+</h2>
 
-Du an gom 3 phan:
-- `frontend`: React dashboard + verify QR
-- `backend`: Node.js/Express API, hash SHA-256, QR generation
-- `blockchain`: Hardhat + Solidity smart contract
+<h2 align="center">  
+   XÂY DỰNG HỆ THỐNG PHÁT HIỆN TÉ NGÃ CỦA CON NGƯỜI TỪ DỮ LIỆU VIDEO DỰ TRÊN KỸ THUẬT THỊ GIÁC MÁY TÍNH VÀ PHÂN TÍCH TƯ THẾ CƠ THỂ
+</h2>
 
-## 1) Chay nhanh (demo mode - khong can Firebase/Blockchain that)
+<div align="center">
+    <p align="center">
+        <img src="https://github.com/tiennq004/cds_nha_tro-sinh_vien_ai/blob/main/img/aiotlab_logo.png" alt="AIoTLab Logo" width="170"/>
+        <img src="https://github.com/tiennq004/cds_nha_tro-sinh_vien_ai/blob/main/img/fitdnu_logo.png" alt="FIT DNU Logo" width="180"/>
+        <img src="https://github.com/tiennq004/cds_nha_tro-sinh_vien_ai/blob/main/img/dnu_logo.png" alt="DaiNam University Logo" width="200"/>
+    </p>
 
-### Backend
+[![AIoTLab](https://img.shields.io/badge/AIoTLab-green?style=for-the-badge)](https://www.facebook.com/DNUAIoTLab)
+[![Faculty of Information Technology](https://img.shields.io/badge/Faculty%20of%20Information%20Technology-blue?style=for-the-badge)](https://dainam.edu.vn/vi/khoa-cong-nghe-thong-tin)
+[![DaiNam University](https://img.shields.io/badge/DaiNam%20University-orange?style=for-the-badge)](https://dainam.edu.vn)
+</div>
+
+---
+
+
+<h2 align="center">
+    <a href="https://dainam.edu.vn/vi/khoa-cong-nghe-thong-tin">
+    🎓 Faculty of Information Technology (DaiNam University)
+    </a>
+</h2>
+
+<h2 align="center">
+HỆ THỐNG TRUY XUẤT NGUỒN GỐC DƯỢC PHẨM VÀ THUỐC ĐẶC TRỊ ỨNG DỤNG CÔNG NGHỆ BLOCKCHAIN
+</h2>
+
+<div align="center">
+    <p align="center">
+        <img src="img/dnu_logo.png" alt="DNU Logo" width="180"/>
+    </p>
+</div>
+
+---
+
+## 1. Mục tiêu của hệ thống
+
+* Xây dựng hệ thống truy xuất nguồn gốc dược phẩm minh bạch và đáng tin cậy.
+* Quản lý thông tin nguyên liệu, thuốc thành phẩm và quá trình phân phối.
+* Ứng dụng Blockchain để đảm bảo dữ liệu không thể bị chỉnh sửa hoặc giả mạo.
+* Hỗ trợ người dùng xác minh nguồn gốc thuốc thông qua mã QR.
+
+### ⚙️ Thành phần hệ thống
+
+🔹 1. Quản lý nguyên liệu
+
+* Đăng ký thông tin nguyên liệu đầu vào.
+* Lưu thông tin nhà cung cấp, số lô và ngày nhập kho.
+* Tạo mã định danh cho từng nguyên liệu.
+
+🔹 2. Quản lý thuốc thành phẩm
+
+* Đăng ký thông tin thuốc sản xuất.
+* Liên kết thuốc với nguyên liệu sử dụng.
+* Sinh mã QR cho từng sản phẩm.
+
+🔹 3. Blockchain & Smart Contract
+
+* Ghi nhận dữ liệu hash SHA-256 lên Blockchain.
+* Lưu lịch sử thay đổi và chuyển giao sản phẩm.
+* Đảm bảo tính toàn vẹn dữ liệu.
+
+🔹 4. Truy xuất nguồn gốc
+
+* Quét mã QR để xem thông tin thuốc.
+* Kiểm tra lịch sử sản xuất và phân phối.
+* Xác minh dữ liệu với Blockchain.
+
+💡 Điểm nổi bật
+
+* Minh bạch toàn bộ chuỗi cung ứng dược phẩm.
+* Chống giả mạo dữ liệu bằng Blockchain.
+* Truy xuất nguồn gốc nhanh chóng bằng QR Code.
+* Dễ dàng mở rộng cho nhiều loại dược phẩm khác nhau.
+
+---
+
+## ⚙️ 2. Công nghệ và công cụ sử dụng
+
+```text
+Nguyên liệu
+      ↓
+Đăng ký dữ liệu
+      ↓
+SHA-256 Hash
+      ↓
+Blockchain
+      ↓
+QR Code
+      ↓
+Người dùng truy xuất
+```
+
+### 🖥️ Công nghệ chính
+
+* ReactJS: Xây dựng giao diện người dùng.
+* NodeJS + ExpressJS: Xử lý nghiệp vụ hệ thống.
+* Firebase: Lưu trữ dữ liệu.
+* Solidity: Xây dựng Smart Contract.
+* Hardhat: Triển khai và kiểm thử Blockchain.
+* MetaMask: Kết nối ví Blockchain.
+* SHA-256: Mã hóa và xác minh dữ liệu.
+* QR Code: Truy xuất nguồn gốc sản phẩm.
+
+### 🛠️ Công cụ phát triển
+
+* Visual Studio Code.
+* NodeJS.
+* GitHub.
+* Firebase Console.
+* MetaMask.
+
+---
+
+## 🧩 3. Hình ảnh các chức năng
+
+### Hình 1: Sơ đồ kiến trúc hệ thống
+
+(Chèn ảnh sơ đồ kiến trúc)
+
+### Hình 2: Giao diện chính
+
+(Chèn ảnh giao diện chính)
+
+### Hình 3: Đăng ký nguyên liệu
+
+(Chèn ảnh đăng ký nguyên liệu)
+
+### Hình 4: Đăng ký thuốc thành phẩm
+
+(Chèn ảnh đăng ký thuốc)
+
+### Hình 5: Phân phối sản phẩm
+
+(Chèn ảnh phân phối)
+
+### Hình 6: Kho mã QR
+
+(Chèn ảnh kho QR)
+
+### Hình 7: Giao diện người bán
+
+(Chèn ảnh người bán)
+
+### Hình 8: Quét QR xác minh nguồn gốc
+
+(Chèn ảnh truy xuất nguồn gốc)
+
+---
+
+## ⚙️ 4. Các bước cài đặt
+
+### Bước 1. Clone dự án
+
 ```bash
-cd backend
-copy .env.example .env
+git clone https://github.com/tiennq004/truy_xuat_nguon_goc.git
+```
+
+### Bước 2. Cài đặt thư viện
+
+```bash
 npm install
+```
+
+### Bước 3. Cấu hình môi trường
+
+Tạo file .env và cấu hình:
+
+```env
+FIREBASE_API_KEY=your_key
+FIREBASE_PROJECT_ID=your_project
+PRIVATE_KEY=your_private_key
+```
+
+### Bước 4. Chạy Frontend
+
+```bash
 npm run dev
 ```
 
-### Frontend
+### Bước 5. Chạy Smart Contract
+
 ```bash
-cd frontend
-copy .env.example .env
-npm install
-npm run dev
+npx hardhat node
+npx hardhat run scripts/deploy.js
 ```
 
-Mo: `http://localhost:5173`
+### Bước 6. Kết nối MetaMask
 
-Trong demo mode:
-- du lieu full luu trong bo nho backend
-- hash "blockchain" duoc mo phong trong bo nho
+* Import ví.
+* Kết nối mạng Blockchain.
+* Xác nhận giao dịch.
 
-## 2) Chay voi blockchain local Ganache/Hardhat node
+---
 
-### Compile contract
-```bash
-cd blockchain
-npm install
-npm run compile
-```
+## 👥 5. Thực hiện
 
-### Chay local chain
-```bash
-cd blockchain
-npm run node
-```
+* Nguyễn Quang Tiến
 
-Mo terminal moi, deploy:
-```bash
-cd blockchain
-npm run deploy:local
-```
+* Lớp: CNTT 16-03
 
-Sau khi deploy:
-1. Lay `CONTRACT_ADDRESS` tu output deploy.
-2. Lay ABI trong:
-   `blockchain/artifacts/contracts/PharmaTrace.sol/PharmaTrace.json`
-3. Cap nhat `backend/.env`:
-   - `RPC_URL=http://127.0.0.1:8545`
-   - `WALLET_PRIVATE_KEY=<private key account deployer>`
-   - `CONTRACT_ADDRESS=<dia chi contract>`
-   - `CONTRACT_ABI_FILE=../blockchain/artifacts/contracts/PharmaTrace.sol/PharmaTrace.json`
+* Khoa: Công nghệ thông tin
 
-Restart backend de bat che do Ethereum that.
+* Trường: Đại học Đại Nam
 
-## 3) Chay voi vi Sepolia co san (MetaMask)
+**Giảng viên hướng dẫn:** ThS. Trần Đăng Công
 
-### Deploy contract len Sepolia
-1. Tao `blockchain/.env` tu file mau:
-```bash
-cd blockchain
-copy .env.example .env
-```
-2. Dien bien trong `blockchain/.env`:
-   - `DEPLOY_RPC_URL=<sepolia rpc url>`
-   - `DEPLOY_PRIVATE_KEY=<private key cua vi MetaMask>`
-3. Deploy:
-```bash
-npm run compile
-npm run deploy:sepolia
-```
-
-### Cap nhat backend theo Sepolia
-Cap nhat `backend/.env`:
-- `RPC_URL=<sepolia rpc url>`
-- `WALLET_PRIVATE_KEY=<private key hop le bat ky de doc chain>`
-- `CONTRACT_ADDRESS=<dia chi contract vua deploy>`
-- `CONTRACT_ABI_FILE=../blockchain/artifacts/contracts/PharmaTrace.sol/PharmaTrace.json`
-
-Sau do restart backend va frontend.
-Trong UI bam `Connect MetaMask` de ky giao dich on-chain truc tiep bang vi cua ban.
-
-## 4) API chinh
-
-- `POST /api/materials`
-  - Dang ky nguyen lieu + hash + ghi chain
-- `POST /api/drugs`
-  - Tao serial thuoc + hash + QR + ghi chain
-- `POST /api/drugs/:serial/transfer`
-  - Chuyen giao thuoc va cap nhat owner/status
-- `GET /api/verify/:serial`
-  - Verify hash Firestore/du lieu voi blockchain
-
-## 5) Firebase
-
-Neu muon bat Firebase that, dien cac bien sau trong `backend/.env`:
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_CLIENT_EMAIL`
-- `FIREBASE_PRIVATE_KEY`
-
-Khi du bien, backend se tu dong chuyen tu memory mode sang Firebase mode.
-
-## 6) Quet QR bang dien thoai (demo trong mang LAN)
-
-Chi dung cho demo/lab: may tinh + dien thoai **cung Wi-Fi**.
-
-Neu QR chua `localhost`, dien thoai se khong mo duoc trang xac minh.
-
-1. Lay IP LAN cua may tinh (vi du `192.168.1.50`).
-2. Chay frontend/backend, mo app bang IP:
-   - Frontend: `http://192.168.1.50:5173`
-   - Backend: `http://192.168.1.50:4000`
-3. Cap nhat `backend/.env`:
-   - `FRONTEND_VERIFY_BASE=http://192.168.1.50:5173/verify`
-4. Tao lai thuoc de sinh QR moi (QR cu van tro ve localhost).
-5. Quet QR: trang `/verify/<ma-thuoc>` se tu dong hien thong tin thuoc.
-
-## 7) Nguoi dung cuoi (quet QR o bat ky dau) — can deploy cong khai
-
-Nguoi mua thuoc **khong the** cung Wi-Fi voi may ban. QR phai tro toi **link internet cong khai** (uu tien HTTPS).
-
-### Kien truc khuyen nghi
-
-| Thanh phan | Vi tri | Vi du |
-|------------|--------|-------|
-| Frontend (Vite) | Vercel / Netlify / Firebase Hosting | `https://tracuuthuoc.vercel.app` |
-| Backend API | Render / Railway / VPS | `https://api-tracuuthuoc.onrender.com` |
-| Du lieu | Firebase (da co) | Firestore |
-| Hash | Blockchain (Sepolia/mainnet) | Contract da deploy |
-
-### Bien moi truong production
-
-**Backend** (`backend/.env` tren server):
-```env
-FRONTEND_VERIFY_BASE=https://tracuuthuoc.vercel.app/verify
-PORT=4000
-# Firebase + RPC + CONTRACT_ADDRESS nhu hien tai
-```
-
-**Frontend** (build production):
-```env
-VITE_API_BASE=https://api-tracuuthuoc.onrender.com/api
-VITE_VERIFY_BASE=https://tracuuthuoc.vercel.app/verify
-```
-
-Build va deploy frontend:
-```bash
-cd frontend
-npm run build
-# upload thu muc dist len hosting
-```
-
-### Luong nguoi dung cuoi
-
-1. Nha san xuat tao thuoc tren web da deploy.
-2. QR chua: `https://domain.com/verify/MA_THUOC`
-3. Khach quet bang camera dien thoai (4G/5G/Wi-Fi bat ky) -> mo trang -> tu dong hien thong tin.
-
-### Demo nhanh khong deploy (chi test ngoai LAN)
-
-Dung **ngrok** (hoac Cloudflare Tunnel) de mo backend + frontend ra internet tam thoi, roi dat `FRONTEND_VERIFY_BASE` bang URL ngrok.
+© 2026 – Khoa Công Nghệ Thông Tin, Trường Đại học Đại Nam.
